@@ -4,478 +4,552 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Schweizer Familien</title>
-<meta name="description" content="Ein Relief der Schweiz aus den Höhendaten von swisstopo: alle 26 Kantone mit Wappen, Farben und Wahrzeichen.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='3' fill='%23D52B1E'/%3E%3Cpath d='M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z' fill='%23fff'/%3E%3C/svg%3E">
+<meta name="description" content="Die ganze Schweiz als 3D-Relief aus swisstopo-Daten: 26 Kantone mit Wappen und Farben, 103 Wahrzeichen in 3D, Orte für Familien, Wanderrouten und Luftbild beim Heranzoomen.">
+<meta name="theme-color" content="#D52B1E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23D52B1E'/%3E%3Cpath d='M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400;1,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@400;500;600;700;800&display=swap">
 <link rel="preload" href="data/geo.json" as="fetch" crossorigin>
 <style>
-/* Layout: das Relief liegt fix hinter der Seite, eine Lesespalte (Desktop links, Telefon unten).
-   Die Markenfarben (--brand …) wechseln mit dem gewählten Kanton, siehe data-kanton auf <html>. */
+/* Schweizer Familien. Aufbau wie zug-family: Das Relief füllt das Fenster; oben eine helle Leiste (auf dem Handy unten
+   eine Tab-Leiste), die Startansicht über dem Relief und ein schwebendes Panel je Bereich (Desktop links, Handy als Blatt).
+   Farben: Schweizer Rot, nach Wahl eines Kantons dessen Farben (--brand … setzt app.js je nach data-kanton). */
 :root{
   color-scheme:light;
-  --paper:#F6F7F9; --ink:#161A22; --ink-2:#4D5565; --mist:#E6E9EE; --rule:rgba(22,26,34,.14);
-  --card:rgba(255,255,255,.9); --halo:rgba(255,255,255,.92); --shadow:rgba(22,26,34,.18);
-  --lake-text:#155E95; --lake-label:#FFFFFF; --lake-halo:rgba(0,40,80,.55);
   --brand:#D52B1E; --brand-text:#B3241A; --on-brand:#FFFFFF; --flag:linear-gradient(90deg,#D52B1E 0 100%);
-  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
-  --f-body:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --brand-ink:var(--brand-text); --brand-hi:var(--brand);
+  --brand-soft:color-mix(in srgb, var(--brand) 12%, #FFFFFF);
+  --text:#161A22; --text-2:#5A6170; --line:#E3E6EB; --line-2:#C8CDD5; --surface:#F0F2F5; --white:#FFFFFF;
+  --paper:#F6F7F9; --glass:rgba(255,255,255,.88); --glass-2:rgba(255,255,255,.96);
+  --radius:18px; --radius-m:14px; --radius-s:10px;
+  --shadow:0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.07);
+  --shadow-hi:0 2px 4px rgba(16,24,40,.06), 0 18px 44px rgba(16,24,40,.13);
+  --font:"Funnel Display",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  /* Namen, die Relief und Beschriftungen verwenden */
+  --ink:var(--text); --ink-2:var(--text-2); --rule:var(--line); --card:var(--glass); --halo:rgba(255,255,255,.92);
+  --lake-text:#155E95; --lake-label:#FFFFFF; --lake-halo:rgba(0,40,80,.55);
+  --top:64px; --tabbar:0px; --pw:min(27rem, calc(100vw - 32px));
   /* Relief */
   --m-land:#EEF0F2; --m-lit:#FFFFFF; --m-shade:#6E7584; --m-forest:#E1E7E1; --m-out:#F2F3F5;
   --m-water:#3A8DCB; --m-water-deep:#0C4C85; --m-contour:#556074; --m-hi:#D52B1E;
   --m-side:#D52B1E; --m-side-2:#7E1710; --m-line:#D52B1E; --m-nation:#D52B1E; --m-cant:#3A4252;
-  --m-river:#2F86C9; --m-shore:#1F6EAD; --m-route:#D99A00;
+  --m-river:#2F86C9; --m-shore:#1F6EAD; --m-route:#D99A00; --m-route-sel:#E0550A;
   --m-dark:0;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --paper:#0A0D13; --ink:#E8ECF2; --ink-2:#A6AFBE; --mist:#151A24; --rule:rgba(232,236,242,.16);
-    --card:rgba(14,18,26,.88); --halo:rgba(10,13,19,.9); --shadow:rgba(0,0,0,.5);
-    --lake-text:#8CC6F0; --lake-label:#AFDBFF; --lake-halo:rgba(2,12,26,.8);
+    --text:#E9EDF2; --text-2:#A6AFBE; --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.22); --surface:#1A1F27; --white:#11151B;
+    --paper:#0A0D13; --glass:rgba(17,21,27,.88); --glass-2:rgba(17,21,27,.97);
+    --brand-soft:color-mix(in srgb, var(--brand) 22%, #11151B);
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); --shadow-hi:0 2px 4px rgba(0,0,0,.35), 0 18px 44px rgba(0,0,0,.5);
+    --halo:rgba(10,13,19,.9); --lake-text:#8CC6F0; --lake-label:#AFDBFF; --lake-halo:rgba(2,12,26,.8);
     --brand-text:#FF7B70;
     --m-land:#1E2430; --m-lit:#404B5E; --m-shade:#05070B; --m-forest:#C3CAD4; --m-out:#10141C;
     --m-water:#114F8E; --m-water-deep:#062851; --m-contour:#8FA3C2; --m-hi:#FF5A4C;
-    --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8; --m-route:#FFC83D;
+    --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8; --m-route:#FFC83D; --m-route-sel:#FF8A3D;
     --m-dark:1;
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --paper:#0A0D13; --ink:#E8ECF2; --ink-2:#A6AFBE; --mist:#151A24; --rule:rgba(232,236,242,.16);
-  --card:rgba(14,18,26,.88); --halo:rgba(10,13,19,.9); --shadow:rgba(0,0,0,.5);
-  --lake-text:#8CC6F0; --lake-label:#AFDBFF; --lake-halo:rgba(2,12,26,.8);
+  --text:#E9EDF2; --text-2:#A6AFBE; --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.22); --surface:#1A1F27; --white:#11151B;
+  --paper:#0A0D13; --glass:rgba(17,21,27,.88); --glass-2:rgba(17,21,27,.97);
+  --brand-soft:color-mix(in srgb, var(--brand) 22%, #11151B);
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); --shadow-hi:0 2px 4px rgba(0,0,0,.35), 0 18px 44px rgba(0,0,0,.5);
+  --halo:rgba(10,13,19,.9); --lake-text:#8CC6F0; --lake-label:#AFDBFF; --lake-halo:rgba(2,12,26,.8);
   --brand-text:#FF7B70;
   --m-land:#1E2430; --m-lit:#404B5E; --m-shade:#05070B; --m-forest:#C3CAD4; --m-out:#10141C;
   --m-water:#114F8E; --m-water-deep:#062851; --m-contour:#8FA3C2; --m-hi:#FF5A4C;
-  --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8; --m-route:#FFC83D;
+  --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8; --m-route:#FFC83D; --m-route-sel:#FF8A3D;
   --m-dark:1;
 }
-*{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
-@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.55;
-  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden;transition:background-color .6s}
-img{max-width:100%}
 [hidden]{display:none!important}
-#scene{position:fixed;left:0;top:0;width:100%;height:100vh;height:100lvh;display:block;z-index:0;outline:none}
-#labels{position:fixed;left:0;top:0;width:100%;height:100vh;height:100lvh;z-index:1;pointer-events:none;overflow:hidden}
-main{position:relative;z-index:2;pointer-events:none}
-main a, main button, .card{pointer-events:auto}
-.wrap{padding-inline:max(16px, 5vw)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow:hidden;overscroll-behavior:none}
+#scene{position:fixed;left:0;top:0;width:100%;height:100%;display:block;z-index:0;outline:none;touch-action:none}
+#labels{position:fixed;left:0;top:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:hidden}
+svg.ic{width:18px;height:18px;flex:none;fill:currentColor}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+a{color:var(--brand-ink);text-underline-offset:2px}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--brand-hi);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
 
-/* ---------- Fortschrittsband, Wortmarke, Kantonswahl */
-.progress{position:fixed;left:0;right:0;top:0;height:calc(3px + env(safe-area-inset-top,0px));z-index:6;pointer-events:none}
-.progress span{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--brand);transform-origin:0 50%;transform:scaleX(0);transition:background-color .6s}
-.mark{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:max(16px,5vw);z-index:5;display:flex;align-items:center;gap:9px;
-  font-family:var(--f-display);font-variation-settings:"wdth" 118;font-weight:700;font-size:13px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--ink);opacity:0;transform:translateY(-6px);transition:opacity .4s, transform .4s;pointer-events:none;
-  padding:6px 12px 6px 8px;margin-left:-8px;background:var(--card);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--rule)}
-.mark.on{opacity:1;transform:none}
-.mark i{font-style:normal;color:var(--brand-text);transition:color .6s}
-.mark img{width:16px;height:19px;object-fit:contain}
-.pick{position:fixed;top:calc(9px + env(safe-area-inset-top,0px));right:max(16px,2.4vw);z-index:6;pointer-events:auto;
-  display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:1px solid var(--rule);background:var(--card);
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink);text-decoration:none;
-  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
-.pick img{width:18px;height:22px;object-fit:contain}
-.pick:hover{border-color:var(--brand)}
-.pick:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+/* ---------- Knöpfe, Pillen */
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 18px;border-radius:var(--radius-s);
+  font:600 15px/1 var(--font);text-decoration:none;cursor:pointer;border:2px solid transparent;transition:background .2s,border-color .2s,color .2s,box-shadow .2s,filter .2s;white-space:nowrap}
+.btn svg{width:15px;height:15px;fill:currentColor}
+.btn-primary{background:var(--brand);color:var(--on-brand)}
+.btn-primary:hover{filter:brightness(.92)}
+.btn-ghost{background:transparent;color:var(--text);border-color:var(--text)}
+.btn-ghost:hover{border-color:var(--brand);color:var(--brand-ink)}
+.btn-soft{background:var(--surface);color:var(--text)}
+.btn-soft:hover{background:var(--brand-soft);color:var(--brand-ink)}
+.btn:disabled{opacity:.45;cursor:default}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);font:600 13px/1.2 var(--font)}
+.pill svg,.pill img{width:14px;height:14px;fill:currentColor;object-fit:contain}
 
-/* ---------- Kapitelindex (Desktop) */
-.nav{position:fixed;right:max(16px,2.4vw);top:50%;transform:translateY(-50%);z-index:5;display:none;flex-direction:column;gap:2px;pointer-events:auto}
-.nav a{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:5px 0;color:var(--ink-2);text-decoration:none;
-  font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
-.nav a span{opacity:0;transform:translateX(6px);transition:opacity .25s, transform .25s;text-shadow:0 0 6px var(--halo)}
-.nav a::after{content:"";width:14px;height:2px;background:currentColor;opacity:.45;transition:width .25s, opacity .25s, background .25s}
-.nav:hover a span, .nav a.on span, .nav a:focus-visible span{opacity:1;transform:none}
-.nav a.on{color:var(--brand-text)}
-.nav a.on::after{width:28px;opacity:1;background:var(--brand)}
-.nav a:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
-@media (min-width:1100px){ .nav{display:flex} }
-
-/* ---------- HUD: LV95 und Nordpfeil */
-.hud{position:fixed;right:max(16px,2.4vw);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;gap:12px;
-  font-family:var(--f-mono);font-size:11.5px;line-height:1.45;color:var(--ink-2);font-variant-numeric:tabular-nums;pointer-events:none;
-  text-shadow:0 0 6px var(--halo), 0 0 2px var(--halo)}
-.hud svg{width:34px;height:34px;flex:none}
-.hud #hudA{font-weight:500;color:var(--ink)}
-.hud .st{display:block}
-@media (max-width:640px){
-  .hud{left:16px;right:auto;top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;font-size:10.5px} .hud svg{width:26px;height:26px}
-  .mark{display:none} .pick span{display:none} .pick{padding:6px}
+/* ---------- obere Leiste */
+.top{position:fixed;left:0;right:0;top:0;z-index:8;height:calc(var(--top) + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) max(16px,2.2vw) 0;
+  display:flex;align-items:center;gap:22px;background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font:700 19px/1 var(--font);letter-spacing:-.01em;white-space:nowrap;min-width:0}
+.brand .mark{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:8px;background:#D52B1E;overflow:hidden}
+.brand .mark svg{width:32px;height:32px}
+.brand .mark img{width:24px;height:29px;object-fit:contain}
+.brand .mark.wap{background:var(--white);border:1.5px solid var(--line-2)}
+.brand b{font-weight:700;color:var(--brand-ink);transition:color .5s}
+.brand > span:last-child{overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:4px;margin-left:auto;align-items:center}
+.tabs a{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:999px;color:var(--text-2);text-decoration:none;font:500 15px/1 var(--font);white-space:nowrap;transition:background .2s,color .2s}
+.tabs a svg{width:18px;height:18px;fill:currentColor;flex:none}
+.tabs a:hover{color:var(--text);background:var(--surface)}
+.tabs a[aria-current="page"]{color:var(--brand-ink);background:var(--brand-soft);font-weight:600}
+.tabs a.t-home{display:none}
+.info-btn{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);color:var(--text);text-decoration:none;flex:none;margin-left:4px}
+.info-btn svg{width:18px;height:18px;fill:currentColor}
+.info-btn:hover{border-color:var(--brand);color:var(--brand-ink)}
+@media (max-width:1100px) and (min-width:761px){ .tabs a{padding:0 10px;gap:6px;font-size:14px} .brand{font-size:17px} .top{gap:12px} }
+@media (max-width:760px){
+  :root{--top:54px; --tabbar:calc(64px + env(safe-area-inset-bottom,0px))}
+  .top{gap:10px;padding-inline:14px;-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--glass-2)}
+  .brand{font-size:17px}
+  .brand .mark{width:28px;height:28px;border-radius:7px}
+  .brand .mark svg{width:28px;height:28px}
+  .brand .mark img{width:20px;height:24px}
+  .info-btn{margin-left:auto;width:36px;height:36px}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:9;height:var(--tabbar);padding:6px 6px env(safe-area-inset-bottom,0px);margin:0;gap:2px;
+    background:var(--glass-2);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border-top:1px solid var(--line);justify-content:space-around}
+  .tabs a{flex:1 1 0;flex-direction:column;justify-content:center;gap:3px;height:52px;padding:0 2px;border-radius:14px;font-size:11px;font-weight:600;min-width:0}
+  .tabs a span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .tabs a svg{width:22px;height:22px}
+  .tabs a.t-home{display:flex}
+  .tabs a:hover{background:transparent}
+  .tabs a[aria-current="page"]{background:var(--brand-soft)}
 }
 
-/* ---------- Einstieg */
-.hero{position:relative;min-height:100svh;display:grid;grid-template-rows:1fr auto minmax(18vh,auto)}
-.band{grid-row:2;position:relative;background:var(--brand);color:var(--on-brand);padding-block:clamp(22px,4vh,40px);transition:background-color .6s,color .6s}
-.band::after{content:"";position:absolute;left:0;right:0;bottom:-8px;height:8px;background:var(--flag)}
-.band .wrap{display:grid;gap:10px}
-.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.92;display:flex;align-items:center;gap:10px}
-.eyebrow img{width:18px;height:22px;object-fit:contain}
-.hero h1{margin:0;font-family:var(--f-display);font-variation-settings:"wdth" 125;font-weight:700;
-  font-size:clamp(2.5rem, 8.6vw, 7.4rem);line-height:.92;letter-spacing:-.015em;text-wrap:balance}
-.under{grid-row:3;padding-block:30px 40px}
-.under .wrap{display:flex;flex-wrap:wrap;gap:18px 48px;align-items:flex-start;justify-content:space-between}
-.lead{margin:0;max-width:36rem;font-size:clamp(1.05rem,1.6vw,1.25rem);line-height:1.5;color:var(--ink);text-shadow:0 0 12px var(--halo)}
-.cue{display:flex;align-items:center;gap:12px;font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);padding-top:6px}
-.cue::before{content:"";width:1px;height:36px;background:linear-gradient(var(--brand),transparent);animation:cue 2.2s ease-in-out infinite}
-@keyframes cue{0%{transform:scaleY(.2);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}100%{transform:scaleY(.2);transform-origin:bottom}}
-@media (prefers-reduced-motion: reduce){ .cue::before{animation:none} }
-.status{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;color:var(--ink-2)}
+/* ---------- Startansicht */
+.home{position:fixed;left:0;right:0;bottom:var(--tabbar);z-index:4;pointer-events:none;transition:opacity .45s, transform .45s, visibility .45s}
+body:not(.m-home) .home,body.touring .home,body.flying .home{opacity:0;transform:translateY(24px);visibility:hidden}
+.home .fade{height:clamp(40px,8vh,90px);background:linear-gradient(to bottom, transparent, var(--paper))}
+.home .inner{background:var(--paper);padding:0 max(16px,5vw) calc(26px + env(safe-area-inset-bottom,0px));pointer-events:auto}
+.home .wrap{max-width:1240px;margin:0 auto}
+.home .headline{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 40px;margin-bottom:20px}
+.home h1{margin:12px 0 0;font:800 clamp(2.4rem,4.3vw,4.1rem)/1.02 var(--font);letter-spacing:-.025em}
+.home h1 .hl{color:var(--brand);transition:color .5s}
+.home .lead{margin:0;max-width:34rem;font-size:clamp(1rem,1.3vw,1.15rem);line-height:1.5;color:var(--text-2)}
+.entries{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.entry{position:relative;display:flex;flex-direction:column;gap:6px;padding:18px 18px 16px;text-decoration:none;color:var(--text);background:var(--white);
+  border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);transition:transform .25s cubic-bezier(.2,.7,.2,1), box-shadow .25s, border-color .25s;min-width:0}
+.entry:hover{transform:translateY(-3px);box-shadow:var(--shadow-hi);border-color:var(--brand-soft)}
+.entry .ei{width:44px;height:44px;border-radius:12px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;margin-bottom:6px;flex:none}
+.entry .ei svg{width:24px;height:24px;fill:currentColor}
+.entry b{font:700 1.2rem/1.15 var(--font);letter-spacing:-.01em;padding-right:44px}
+.entry .d{font-size:14.5px;line-height:1.4;color:var(--text-2);padding-right:30px}
+.entry small{position:absolute;right:16px;top:18px;font:600 12.5px/1 var(--font);color:var(--text-2);background:var(--surface);padding:5px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+.entry small:empty{display:none}
+.entry .go{position:absolute;right:16px;bottom:16px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--text);transition:background .2s,color .2s,transform .25s}
+.entry .go svg{width:14px;height:14px;fill:currentColor}
+.entry:hover .go{background:var(--brand);color:var(--on-brand);transform:translateX(2px)}
+.home .row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-top:16px}
+.home .status{font-size:13px;color:var(--text-2)}
+.wstrip{display:flex;align-items:center;gap:2px;margin-left:auto;flex-wrap:nowrap}
+.wstrip span{font:600 13px/1 var(--font);color:var(--text-2);margin-right:6px;white-space:nowrap}
+.wstrip button{appearance:none;width:28px;height:34px;display:grid;place-items:center;border:1px solid transparent;border-radius:8px;background:transparent;cursor:pointer;padding:0;flex:none}
+.wstrip button img{width:19px;height:23px;object-fit:contain}
+.wstrip button:hover{background:var(--surface)}
+.wstrip button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
+@media (max-width:1300px){ .wstrip{display:none} }
+@media (max-width:1100px){ .entries{grid-template-columns:repeat(2,minmax(0,1fr))} .entry .d{font-size:13.5px} }
+@media (max-width:760px){
+  .home .fade{height:44px}
+  .home .inner{padding:0 14px 14px}
+  .home .headline{margin-bottom:12px}
+  .home h1{font-size:2.15rem;margin-top:8px}
+  .home .lead{display:none}
+  .entries{gap:8px}
+  .entry{padding:11px 12px;gap:2px;border-radius:var(--radius-m);flex-direction:row;align-items:center;box-shadow:none}
+  .entry .ei{width:36px;height:36px;border-radius:10px;margin:0 8px 0 0}
+  .entry .ei svg{width:20px;height:20px}
+  .entry b{font-size:.98rem;hyphens:auto;overflow-wrap:anywhere;padding-right:0}
+  .entry .d,.entry .go,.entry small{display:none}
+  .home .row{margin-top:10px;gap:8px}
+  .home .row .btn{height:38px;font-size:14px;padding:0 14px}
+  .home .status:empty{display:none}
+}
 
-/* ---------- Kapitel */
-.chapter{min-height:150vh;display:flex;align-items:center}
-.chapter .wrap{width:100%}
-.card{width:min(26rem,100%);background:var(--card);
-  -webkit-backdrop-filter:blur(10px) saturate(1.15);backdrop-filter:blur(10px) saturate(1.15);
-  border-top:4px solid var(--brand);padding:22px 26px 22px;box-shadow:0 18px 40px -26px var(--shadow);transition:border-color .6s}
-.kicker{margin:0 0 10px;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-text);line-height:1.5;transition:color .6s}
-.card h2{margin:0 0 12px;font-family:var(--f-display);font-variation-settings:"wdth" 104;font-weight:680;font-size:clamp(1.55rem,2.6vw,2.15rem);
-  line-height:1.06;letter-spacing:-.01em;text-wrap:balance}
-.card p{margin:0 0 14px;color:var(--ink)}
-.card p.hint{color:var(--ink-2);font-size:15px}
-@media (hover:none){ .hint-hover{display:none} }
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(7.2rem,1fr));gap:12px 18px;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--rule)}
-.facts div{min-width:0}
-.facts dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
-.facts dd{margin:2px 0 0;font-family:var(--f-mono);font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink)}
-.rows{list-style:none;margin:16px 0 0;padding:12px 0 0;border-top:1px solid var(--rule);display:grid;gap:4px;
-  font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
-.rows li{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.rows li span:first-child{font-family:var(--f-body);font-size:15px;display:flex;align-items:center;gap:8px}
-.rows li img{width:14px;height:17px;object-fit:contain}
-.rows li span:last-child{color:var(--ink-2);text-align:right}
+/* ---------- Rundflug */
+.caption{position:fixed;left:max(16px,4vw);bottom:calc(24px + var(--tabbar));z-index:5;width:min(29rem,calc(100vw - 32px));
+  background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px 16px;box-shadow:var(--shadow-hi);transition:opacity .4s, transform .4s}
+.caption[hidden]{display:block!important;opacity:0;transform:translateY(16px);pointer-events:none;visibility:hidden}
+.caption h2{margin:10px 0 6px;font:700 1.5rem/1.12 var(--font);letter-spacing:-.015em}
+.caption p{margin:0 0 12px;font-size:15.5px;color:var(--text-2)}
+.caption .crow{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;color:var(--text-2)}
+.caption .crow .num{white-space:nowrap}
+.caption .crow .btns{display:flex;gap:6px}
+.caption .crow .btn{height:36px;padding:0 12px;font-size:14px}
+.caption .bar{height:4px;border-radius:4px;background:var(--surface);margin:0 0 12px;overflow:hidden}
+.caption .bar i{display:block;height:100%;background:var(--brand);width:0;border-radius:4px}
+.caption .wl{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.caption .wl img{width:18px;height:22px;object-fit:contain}
+.caption .wl:empty{display:none}
+@media (max-width:760px){ .caption{left:10px;right:10px;width:auto;bottom:calc(var(--tabbar) + 10px);padding:14px 16px 12px} .caption h2{font-size:1.25rem} .caption p{font-size:14.5px} .caption .wl{display:none} }
 
-/* ---------- Kantonswahl */
-.finale{min-height:130vh;display:flex;align-items:center}
-.finale .card{width:min(31rem,100%)}
-.tiles{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:14px 0 6px}
-.tiles button{appearance:none;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:7px 2px 5px;
-  border:1px solid var(--rule);background:transparent;color:var(--ink);cursor:pointer;
-  font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;transition:background .2s,border-color .2s,color .2s}
-.tiles button img{width:22px;height:27px;object-fit:contain;pointer-events:none}
-.tiles button:hover{border-color:var(--brand)}
-.tiles button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
-.tiles button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.tiles .all{grid-column:span 1}
-.tiles .all svg{width:22px;height:27px}
-.detail{margin-top:12px;padding-top:14px;border-top:1px solid var(--rule)}
-.dhead{display:flex;gap:14px;align-items:center}
-.dhead img{width:52px;height:63px;object-fit:contain;flex:none}
-.dhead h3{margin:0;font-family:var(--f-display);font-variation-settings:"wdth" 106;font-weight:700;font-size:1.45rem;line-height:1.08}
-.dhead p{margin:2px 0 0;font-size:14.5px;color:var(--ink-2)}
-.flagbar{height:6px;margin:12px 0 0;background:var(--flag)}
-.marks{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}
-.marks button{appearance:none;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;text-align:left;
-  padding:8px 10px;border:1px solid var(--rule);background:transparent;color:var(--ink);cursor:pointer;font-family:var(--f-body);font-size:15px;
-  transition:background .2s,border-color .2s}
-.marks button::before{content:"";grid-row:span 2;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-top:6px}
-.marks button b{font-weight:600}
-.marks button small{grid-column:2;font-size:13.5px;color:var(--ink-2);line-height:1.4}
-.marks button:hover{border-color:var(--brand)}
-.marks button[aria-pressed="true"]{border-color:var(--brand);background:color-mix(in srgb, var(--brand) 12%, transparent)}
-.marks button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.sel{margin:10px 0 0;font-size:15px;color:var(--ink-2)}
-.xgo{appearance:none;display:inline-flex;align-items:center;gap:8px;margin:16px 0 0;padding:9px 14px;border:0;background:var(--brand);color:var(--on-brand);cursor:pointer;
-  font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;transition:background-color .6s}
-.xgo svg{width:16px;height:16px}
-.xgo:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
-.sel b{color:var(--ink);font-weight:600}
+/* ---------- Panel */
+.panel{position:fixed;z-index:6;left:max(16px,1.6vw);top:calc(var(--top) + env(safe-area-inset-top,0px) + 14px);bottom:16px;width:var(--pw);
+  display:flex;flex-direction:column;background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);
+  border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-hi);overflow:hidden;transition:transform .5s cubic-bezier(.2,.7,.2,1), opacity .35s}
+body.m-home .panel,body.touring .panel,body.flying .panel{transform:translateX(calc(-100% - 40px));opacity:0;pointer-events:none}
+.panel .ph{flex:none;padding:18px 20px 6px}
+.panel .pscroll{flex:1;min-height:0;overflow:auto;padding:0 12px 12px;overscroll-behavior:contain;scrollbar-width:thin}
+.panel .pfoot{flex:none;padding:10px 20px 12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--text-2);display:flex;justify-content:space-between;gap:10px}
+.panel .pfoot a{color:var(--text-2)}
+.handle{display:none}
+.kicker{display:inline-flex;align-items:center;gap:6px;margin:0 0 10px;padding:5px 12px;border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);font:600 13px/1.2 var(--font)}
+.kicker svg{width:14px;height:14px;fill:currentColor}
+.kicker img{width:13px;height:16px;object-fit:contain}
+.panel h2{margin:0 0 8px;font:700 clamp(1.35rem,1.8vw,1.6rem)/1.12 var(--font);letter-spacing:-.015em;text-wrap:balance}
+.panel .intro{margin:0 0 10px;font-size:15px;color:var(--text-2)}
+.panel.has-detail .ph > :not(.kicker){display:none}
+.panel.has-detail .ph{padding-bottom:0}
+.pscroll .detail:not([hidden]), .pscroll .list:not([hidden]){animation:rise .35s cubic-bezier(.2,.7,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){ .pscroll .detail, .pscroll .list{animation:none!important} }
+@media (max-width:760px){
+  .panel{left:0;right:0;top:auto;bottom:var(--tabbar);width:auto;height:var(--sheet,46svh);border-radius:22px 22px 0 0;border-bottom:0;
+    transition:transform .45s cubic-bezier(.2,.7,.2,1), opacity .35s, height .3s}
+  .panel.dragging{transition:none}
+  body.m-home .panel,body.touring .panel,body.flying .panel{transform:translateY(calc(100% + var(--tabbar) + 30px))}
+  .handle{display:block;appearance:none;border:0;background:transparent;width:100%;height:28px;flex:none;cursor:grab;position:relative;padding:0;touch-action:none}
+  .handle::before{content:"";position:absolute;left:50%;top:10px;width:44px;height:5px;border-radius:3px;background:var(--line-2);transform:translateX(-50%)}
+  .panel .ph{padding:0 16px 4px}
+  .panel .pscroll{padding:0 8px calc(8px + env(safe-area-inset-bottom,0px))}
+  .panel h2{font-size:1.2rem;margin-bottom:6px}
+  .panel .intro{font-size:14px;margin-bottom:6px}
+  .kicker{margin-bottom:6px;font-size:12px;padding:4px 10px}
+  .panel .pfoot{display:none}
+}
 
-/* ---------- Fuss */
-footer{position:relative;z-index:2;background:var(--paper);border-top:1px solid var(--rule)}
-footer .wrap{padding-block:34px 44px;display:grid;gap:10px;max-width:72rem}
-footer p{margin:0;font-size:14.5px;color:var(--ink-2);max-width:66ch}
-footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+/* ---------- Filter */
+.flt{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px}
+.chip{appearance:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:0;border-radius:999px;background:var(--surface);color:var(--text);
+  font:500 13.5px/1 var(--font);cursor:pointer;transition:background .2s,color .2s;white-space:nowrap}
+.chip svg{width:15px;height:15px;fill:currentColor}
+.chip img{width:20px;height:20px;margin-left:-5px}
+.chip small{font-size:11.5px;color:var(--text-2);font-variant-numeric:tabular-nums}
+a.chip{text-decoration:none}
+.chip:hover{background:var(--brand-soft)}
+.chip[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+.chip[aria-pressed="true"] small{color:inherit;opacity:.85}
+.chip:disabled{opacity:.5;cursor:default}
+.flt select{appearance:none;-webkit-appearance:none;font:500 14px/1 var(--font);height:38px;padding:0 34px 0 12px;border:1px solid var(--line-2);border-radius:var(--radius-s);background:var(--white) no-repeat right 12px center/12px 12px;color:var(--text);max-width:100%;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%235A6170' stroke-width='1.6'/%3E%3C/svg%3E")}
+.flt select:hover{border-color:var(--brand)}
+.count{font-size:12.5px;color:var(--text-2);margin:8px 0 4px;display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+@media (max-width:760px){ .flt{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin-inline:-16px;padding-inline:16px} .flt::-webkit-scrollbar{display:none} .chip{height:34px;flex:none} .flt select{flex:none;font-size:16px} }
+
+/* ---------- Listen */
+.list{display:grid;gap:2px}
+.grp{position:sticky;top:0;z-index:1;margin:10px 0 2px;padding:8px 8px 6px;background:var(--glass-2);font:600 12px/1 var(--font);letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-2);display:flex;justify-content:space-between;align-items:center;gap:8px;border-radius:8px}
+.grp img{width:14px;height:17px;object-fit:contain;margin-right:6px;vertical-align:-3px}
+.grp:first-child{margin-top:2px}
+.it{appearance:none;display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;padding:9px 8px;
+  border:0;border-radius:12px;background:transparent;color:var(--text);cursor:pointer;font:inherit;transition:background .15s}
+a.it{text-decoration:none;color:var(--text)}
+.it:hover{background:var(--surface)}
+.it:focus-visible{outline:2px solid var(--brand-hi);outline-offset:-2px}
+.it .pin{width:36px;height:36px;border-radius:10px;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;overflow:hidden}
+.it .pin svg{width:19px;height:19px;fill:currentColor}
+.it .pin img{width:24px;height:29px;object-fit:contain}
+.it .pin.ic{background:transparent}
+.it .pin.ic img{width:34px;height:34px}
+.it .pin.wp{background:var(--white);border:1px solid var(--line)}
+.it .pin.nr{font:800 14px/1 var(--font);background:var(--surface);color:var(--text)}
+.it .pin.nr.nat{background:var(--brand);color:var(--on-brand)}
+.it .tx{min-width:0}
+.it .tx b{display:block;font-weight:600;font-size:15px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it .tx span{display:block;font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it .sh{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--text-2);text-align:right;white-space:nowrap}
+.empty{padding:18px 8px;color:var(--text-2);font-size:15px}
+.more{appearance:none;width:100%;margin:10px 0 0;height:40px;border:1px solid var(--line-2);border-radius:var(--radius-s);background:transparent;color:var(--brand-ink);cursor:pointer;font:600 14px/1 var(--font)}
+.more:hover{border-color:var(--brand)}
+
+/* ---------- Detail */
+.detail{padding:0 4px}
+.detail .back{appearance:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 8px;border:0;border-radius:999px;background:var(--surface);color:var(--text);font:600 14px/1 var(--font);cursor:pointer;margin:4px 0 12px}
+.detail .back:hover{background:var(--brand-soft);color:var(--brand-ink)}
+.detail .back svg{width:16px;height:16px;fill:currentColor}
+.detail .dhead{display:flex;gap:14px;align-items:center;margin:0 0 4px}
+.detail .dhead img{width:52px;height:63px;object-fit:contain;flex:none}
+.detail .dhead img.ico{width:48px;height:48px}
+.detail h3{margin:0 0 4px;font:700 1.45rem/1.15 var(--font);letter-spacing:-.015em}
+.detail .sub{margin:0 0 12px;font-size:14px;color:var(--text-2)}
+.detail .dhead .sub{margin:0}
+.detail p.txt{margin:10px 0 12px;font-size:15.5px;line-height:1.55;overflow-wrap:anywhere}
+.detail .flagbar{height:6px;border-radius:3px;margin:12px 0 0;background:var(--flag)}
+.detail .links{list-style:none;margin:14px 0 4px;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.detail .links a,.detail .links button{appearance:none;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:var(--radius-s);border:2px solid var(--text);background:transparent;color:var(--text);text-decoration:none;font:600 14px/1.2 var(--font);cursor:pointer}
+.detail .links li:first-child a,.detail .links li:first-child button{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.detail .links a:hover,.detail .links button:hover{border-color:var(--brand);color:var(--brand-ink)}
+.detail .links li:first-child a:hover,.detail .links li:first-child button:hover{filter:brightness(.92);color:var(--on-brand)}
+.detail .links svg{width:15px;height:15px;fill:currentColor}
+.detail .note{font-size:13px;color:var(--text-2);margin:10px 0 0}
+.detail .btns{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+.detail .btns a{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:var(--radius-s);background:var(--surface);text-decoration:none;color:var(--text);font:600 14px/1 var(--font)}
+.detail .btns a:hover{background:var(--brand-soft);color:var(--brand-ink)}
+.detail .btns a svg{width:16px;height:16px;fill:currentColor}
+.detail .btns a small{font-weight:600;font-size:12px;color:var(--text-2);background:var(--white);border-radius:999px;padding:3px 7px}
+.detail .sec{margin:18px 0 2px;padding:0 4px;font:600 12px/1 var(--font);letter-spacing:.04em;text-transform:uppercase;color:var(--text-2);display:flex;justify-content:space-between}
+.detail .list{margin:0 -4px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(8rem,1fr));gap:8px;margin:12px 0 0;padding:0}
+.facts div{min-width:0;background:var(--surface);border-radius:12px;padding:10px 12px}
+.facts dt{font-size:12px;color:var(--text-2);line-height:1.3}
+.facts dd{margin:3px 0 0;font:700 15px/1.3 var(--font);color:var(--text);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.facts dd.t{font-weight:500;font-size:14.5px}
+
+/* ---------- Kartensteuerung, HUD */
+.mapctl{position:fixed;right:max(16px,1.6vw);top:calc(var(--top) + env(safe-area-inset-top,0px) + 14px);z-index:5;display:flex;flex-direction:column;gap:8px}
+.mapctl .grp2{display:flex;flex-direction:column;background:var(--glass-2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.mapctl button{appearance:none;width:42px;height:42px;display:grid;place-items:center;border:0;background:transparent;color:var(--text);cursor:pointer;font:500 20px/1 var(--font)}
+.mapctl .grp2 button + button{border-top:1px solid var(--line)}
+.mapctl button:hover{background:var(--surface);color:var(--brand-ink)}
+.mapctl button[aria-pressed="true"],.mapctl button[aria-expanded="true"]{background:var(--brand-soft);color:var(--brand-ink)}
+.mapctl #tFly[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+.mapctl #north{transition:transform .1s linear}
+body.flying .mapctl .grp2:nth-child(-n+2){display:none}
+@media (max-width:760px){ .mapctl{right:10px;top:calc(var(--top) + env(safe-area-inset-top,0px) + 10px);gap:6px} .mapctl button{width:38px;height:38px;font-size:18px} .mapctl .grp2:first-child{display:none} body.m-home .mapctl{display:none} }
+.hud{position:fixed;right:max(16px,1.6vw);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:3;
+  font:500 11.5px/1.45 var(--mono);color:var(--text-2);font-variant-numeric:tabular-nums;pointer-events:none;text-align:right;
+  text-shadow:0 0 6px var(--halo), 0 0 2px var(--halo)}
+.hud #hudA{color:var(--text)}
+.hud .st{display:block}
+body.m-home .hud{display:none}
+@media (max-width:760px){ .hud{display:none} body.flying .hud{display:block;top:calc(var(--top) + env(safe-area-inset-top,0px) + 10px);bottom:auto;left:12px;right:auto;text-align:left;font-size:10.5px} }
+.hint{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:3;pointer-events:none;
+  font-size:13px;color:var(--text);background:var(--glass-2);padding:8px 14px;border-radius:999px;border:1px solid var(--line);box-shadow:var(--shadow);opacity:0;transition:opacity .5s;white-space:nowrap}
+.hint.on{opacity:1}
+@media (min-width:761px){ body:not(.m-home):not(.flying) .hint{left:calc(var(--pw) + max(16px,1.6vw) + (100vw - var(--pw) - max(16px,1.6vw)) / 2)} }
+@media (max-width:760px){ .hint{display:none} }
+.attrib{position:fixed;right:max(16px,1.6vw);bottom:calc(52px + env(safe-area-inset-bottom,0px));z-index:3;font-size:11px;color:var(--text-2);text-shadow:0 0 4px var(--halo),0 0 2px var(--halo);pointer-events:none;opacity:0;transition:opacity .4s}
+.attrib.on{opacity:1}
+@media (max-width:760px){ .attrib{right:12px;top:calc(var(--top) + env(safe-area-inset-top,0px) + 6px);bottom:auto;font-size:10px;max-width:calc(100vw - 80px)} body.flying .attrib{top:auto;right:auto;left:12px;bottom:calc(var(--tabbar) + 84px)} }
+
+/* ---------- Ebenen-Fenster */
+.pop{position:fixed;z-index:7;right:calc(max(16px,1.6vw) + 54px);top:calc(var(--top) + env(safe-area-inset-top,0px) + 14px);width:min(20rem,calc(100vw - 24px));max-height:calc(100svh - var(--top) - 40px);overflow:auto;
+  background:var(--glass-2);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-hi);padding:14px 14px 12px;
+  opacity:0;transform:translateY(6px);transition:opacity .2s, transform .2s, visibility .2s;pointer-events:none;visibility:hidden;overscroll-behavior:contain}
+.pop.on{opacity:1;transform:none;pointer-events:auto;visibility:visible}
+.pop .x{position:absolute;right:10px;top:10px;appearance:none;border:0;width:34px;height:34px;border-radius:50%;background:var(--surface);color:var(--text);font-size:18px;line-height:1;cursor:pointer}
+.pop h4{margin:2px 40px 6px 4px;font:700 1.1rem/1.2 var(--font)}
+.lg-h{margin:12px 4px 4px;font:600 12px/1 var(--font);letter-spacing:.04em;text-transform:uppercase;color:var(--text-2)}
+.lg-row{position:relative;display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;min-height:42px;padding:4px 6px;border-radius:10px;font-size:14.5px;cursor:pointer}
+.lg-row:hover{background:var(--surface)}
+.lg-row input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.lg-row .sw{display:grid;place-items:center;width:28px;height:28px}
+.lg-row .sw img{width:26px;height:26px}
+.lg-row .sw i{display:block;width:22px;height:14px;font-style:normal}
+.lg-row small{display:block;font-size:12px;color:var(--text-2)}
+.lg-row .tg{width:36px;height:22px;border-radius:999px;background:var(--line-2);position:relative;transition:background .2s;flex:none}
+.lg-row .tg::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s}
+.lg-row input:checked ~ .tg{background:var(--brand)}
+.lg-row input:checked ~ .tg::after{transform:translateX(14px)}
+.lg-row input:focus-visible ~ .tg{outline:2px solid var(--brand-hi);outline-offset:2px}
+.sw-sat{background:linear-gradient(135deg,#5E7F4A,#8FA36A 45%,#C9B98F 46%,#6E8A55);border-radius:3px}
+.sw-trail{background:linear-gradient(transparent 5px,var(--m-route) 5px 9px,transparent 9px)}
+.sw-mark{width:14px!important;height:14px!important;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px var(--brand-soft)}
+.sw-border{background:linear-gradient(transparent 5px,var(--m-nation) 5px 8px,transparent 8px)}
+.sw-water{background:linear-gradient(transparent 5px,var(--m-river) 5px 8px,transparent 8px)}
+.sw-label{font:700 12px/14px var(--font);text-align:center;color:var(--text)}
+.lg-src{margin:10px 4px 0;font-size:12px;line-height:1.45;color:var(--text-2)}
+@media (max-width:760px){ .pop{left:10px;right:10px;width:auto;top:auto;bottom:calc(var(--tabbar) + 10px);max-height:64svh} }
+
+/* ---------- Freier Flug */
+.flybar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:12px;
+  background:var(--glass-2);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 16px;box-shadow:var(--shadow-hi);max-width:calc(100vw - 24px)}
+body.flying .flybar{display:flex}
+.flybar .keys{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.flybar kbd{font:600 11.5px/1 var(--mono);border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:2px 5px;color:var(--text);background:var(--white)}
+.flybar .btn{height:38px;border-radius:999px;font-size:14px;padding:0 16px;flex:none}
+.joy{position:fixed;left:0;top:0;width:120px;height:120px;border-radius:50%;border:2px solid var(--line-2);background:color-mix(in srgb,var(--glass-2) 70%,transparent);z-index:8;pointer-events:none}
+.joy span{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:var(--brand);opacity:.9}
+.flybtns{position:fixed;right:12px;bottom:calc(var(--tabbar) + 76px);z-index:7;display:none;flex-direction:column;gap:8px}
+.flybtns button{appearance:none;width:54px;height:54px;border:1px solid var(--line);border-radius:16px;background:var(--glass-2);color:var(--text);font-size:20px;touch-action:none;box-shadow:var(--shadow)}
+body.flying.touch .flybtns{display:flex}
+@media (max-width:760px){ .flybar{left:10px;right:10px;transform:none;max-width:none;bottom:calc(var(--tabbar) + 10px);padding:5px 5px 5px 14px;border-radius:22px} .flybar .keys{flex:1;white-space:normal;font-size:12.5px;line-height:1.35} body.flying .mapctl{display:none} .flybtns{bottom:calc(var(--tabbar) + 82px)} }
+
+/* ---------- Info */
+.info-dlg{position:fixed;inset:0;z-index:10;display:grid;place-items:center;background:rgba(11,14,18,.45);padding:16px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.info-dlg .box{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow-hi);max-width:56rem;width:100%;max-height:calc(100svh - 32px);overflow:auto;padding:28px 30px;position:relative}
+.info-dlg .x{position:absolute;right:14px;top:14px;appearance:none;border:0;width:38px;height:38px;border-radius:50%;background:var(--surface);font-size:22px;line-height:1;color:var(--text);cursor:pointer}
+.info-dlg .x:hover{background:var(--brand-soft)}
+.info-dlg h2{margin:0 0 18px;font:700 1.55rem/1.15 var(--font);letter-spacing:-.015em;padding-right:44px}
+.info-dlg .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:18px 32px}
+.info-dlg h3{margin:0 0 6px;font:700 13px/1.3 var(--font);letter-spacing:.04em;text-transform:uppercase;color:var(--text-2)}
+.info-dlg p{margin:0 0 8px;font-size:14.5px;color:var(--text-2)}
+.info-dlg address{font-style:normal;font-size:14.5px;line-height:1.5}
+@media (max-width:760px){ .info-dlg{padding:10px;align-items:end} .info-dlg .box{padding:22px 18px;max-height:calc(100svh - 20px)} }
 
 /* ---------- Beschriftungen im Relief */
 .lbl{position:absolute;left:0;top:0;white-space:nowrap;opacity:0;will-change:transform,opacity;
   text-shadow:0 0 3px var(--halo),0 0 8px var(--halo),0 0 14px var(--halo)}
-.lbl.canton{font-family:var(--f-display);font-variation-settings:"wdth" 112;font-weight:650;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink)}
-.lbl.canton small{display:block;font-family:var(--f-body);font-weight:400;font-size:11px;letter-spacing:.04em;text-transform:none;color:var(--ink-2);text-align:center}
-.lbl.lake{font-family:var(--f-body);font-style:italic;font-weight:600;font-size:13.5px;letter-spacing:.05em;color:var(--lake-label);text-shadow:0 0 6px var(--lake-halo),0 1px 2px var(--lake-halo)}
-.lbl.peak{font-family:var(--f-body);font-size:13px;color:var(--ink);display:flex;align-items:center;gap:6px}
-.lbl.peak::before{content:"";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid var(--ink)}
-.lbl.peak em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--ink-2)}
-.lbl.poi{font-family:var(--f-body);font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px}
+.lbl.canton{font:700 12.5px/1.1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--text)}
+.lbl.lake{font:italic 600 14px/1 var(--font);letter-spacing:.04em;color:var(--lake-label);text-shadow:0 0 6px var(--lake-halo),0 1px 2px var(--lake-halo)}
+.lbl.peak{font:500 13px/1 var(--font);color:var(--text);display:flex;align-items:center;gap:6px}
+.lbl.peak::before{content:"";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid var(--text)}
+.lbl.peak em{font-style:normal;font-size:11px;color:var(--text-2)}
+.lbl.poi{font:600 13px/1 var(--font);color:var(--text);display:flex;align-items:center;gap:6px}
 .lbl.poi::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 2px var(--halo);flex:none}
 .lbl.poi.on{font-size:14.5px}
 .lbl.poi.on::before{width:11px;height:11px}
+.lbl.hit{pointer-events:auto;cursor:pointer}
 
 /* ---------- Tooltip */
 .tip{position:fixed;left:0;top:0;z-index:7;pointer-events:none;opacity:0;transition:opacity .15s;
-  background:var(--card);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:3px solid var(--brand);
-  padding:9px 12px 10px;min-width:11rem;box-shadow:0 10px 26px -16px var(--shadow)}
+  background:var(--glass-2);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;
+  padding:10px 13px 11px;min-width:11rem;max-width:18rem;box-shadow:var(--shadow-hi)}
 .tip.on{opacity:1}
-.tip b{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-variation-settings:"wdth" 108;font-weight:680;font-size:15px;letter-spacing:.01em}
-.tip b img{width:14px;height:17px;object-fit:contain}
-.tip span{display:block;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
-
-/* ---------- kleine Bildschirme: Karten unten, Relief darüber */
-@media (max-width:760px){
-  body{font-size:16px}
-  .chapter,.finale{align-items:flex-end;min-height:140svh}
-  .chapter .wrap,.finale .wrap{padding-bottom:9svh}
-  .card{padding:18px 18px 16px}
-  .card p{font-size:15.5px}
-  .finale .card{max-height:74svh;overflow:auto;overscroll-behavior:contain}
-  .tiles{grid-template-columns:repeat(6,minmax(0,1fr))}
-  .hero{grid-template-rows:1fr auto auto}
-  .under{padding-block:24px 28px}
-}
-.noscene .cue{display:none}
-.noscene .tools{display:none}
-/* ---------- Ebenen und Erkunden */
-.tools{position:fixed;right:max(16px,2.4vw);top:calc(56px + env(safe-area-inset-top,0px));z-index:6;display:flex;gap:8px;pointer-events:auto}
-.exploring .tools{top:calc(12px + env(safe-area-inset-top,0px))}
-.exploring .legend{top:calc(60px + env(safe-area-inset-top,0px))}
-.tbtn{appearance:none;display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--rule);background:var(--card);color:var(--ink);cursor:pointer;
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 10px 24px -18px var(--shadow)}
-.tbtn svg{width:16px;height:16px;flex:none}
-.tbtn:hover{border-color:var(--brand)}
-.tbtn[aria-pressed="true"],.tbtn[aria-expanded="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
-.tbtn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
-.legend{position:fixed;right:max(16px,2.4vw);top:calc(104px + env(safe-area-inset-top,0px));z-index:7;width:min(19rem,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;
-  background:var(--card);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:4px solid var(--brand);padding:12px 14px 12px;box-shadow:0 18px 40px -24px var(--shadow);pointer-events:auto}
-.legend header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.legend header b{font-family:var(--f-display);font-variation-settings:"wdth" 106;font-weight:700;font-size:17px}
-.legend header button{appearance:none;border:0;background:transparent;color:var(--ink-2);font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
-.lg-h{margin:10px 0 4px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-text)}
-.lg-row{display:grid;grid-template-columns:auto 26px 1fr;gap:9px;align-items:center;padding:4px 0;font-size:14.5px;cursor:pointer}
-.lg-row input{width:16px;height:16px;margin:0;accent-color:var(--brand)}
-.lg-sw{display:flex;align-items:center;justify-content:center}
-.lg-sw img{width:24px;height:24px}
-.lg-sw i{display:block;width:22px;height:14px;font-style:normal}
-.sw-sat{background:linear-gradient(135deg,#5E7F4A,#8FA36A 45%,#C9B98F 46%,#6E8A55);border-radius:2px}
-.sw-trail{background:linear-gradient(transparent 5px,var(--m-route) 5px 9px,transparent 9px)}
-.sw-mark{width:14px!important;height:14px!important;border-radius:50%;background:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 30%,transparent)}
-.sw-border{background:linear-gradient(transparent 5px,var(--m-nation) 5px 8px,transparent 8px)}
-.sw-water{background:linear-gradient(transparent 5px,var(--m-river) 5px 8px,transparent 8px)}
-.sw-label{font-family:var(--f-display);font-weight:700;font-size:12px;text-align:center;color:var(--ink)}
-.lg-src{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--ink-2)}
-.xbar{position:fixed;left:max(16px,2.4vw);top:calc(12px + env(safe-area-inset-top,0px));max-width:min(40rem,calc(100vw - 360px));z-index:6;display:none;align-items:center;gap:12px;pointer-events:auto;
-  background:var(--card);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--rule);padding:6px 8px 6px 6px;box-shadow:0 12px 30px -20px var(--shadow)}
-.exploring .xbar{display:flex}
-.seg{display:flex;border:1px solid var(--rule)}
-.seg button{appearance:none;border:0;background:transparent;color:var(--ink);padding:7px 12px;cursor:pointer;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
-.seg button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
-.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
-.keys{font-family:var(--f-mono);font-size:11px;line-height:1.7;color:var(--ink-2)}
-.keys kbd{font-family:inherit;border:1px solid var(--rule);padding:0 4px;margin:0 1px;color:var(--ink)}
-.attrib{position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:5;display:none;font-size:11px;color:var(--ink-2);text-shadow:0 0 4px var(--halo),0 0 2px var(--halo);pointer-events:none;white-space:nowrap}
-.exploring .attrib{display:block}
-.joy{position:fixed;left:0;top:0;width:120px;height:120px;border-radius:50%;border:2px solid var(--rule);background:color-mix(in srgb,var(--card) 70%,transparent);z-index:8;pointer-events:none}
-.joy span{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:var(--brand);opacity:.85}
-.flybtns{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:7;display:none;flex-direction:column;gap:8px;pointer-events:auto}
-.flybtns button{appearance:none;width:52px;height:52px;border:1px solid var(--rule);background:var(--card);color:var(--ink);font-size:20px;touch-action:none}
-.exploring.fly-touch .flybtns{display:flex}
-.exploring main,.exploring footer,.exploring .nav,.exploring .progress,.exploring .mark,.exploring .pick{opacity:0;visibility:hidden;pointer-events:none}
-main,footer,.nav,.mark,.pick{transition:opacity .45s, visibility .45s}
-html.exploring,html.exploring body{overflow:hidden;overscroll-behavior:none}
-.exploring #scene{cursor:grab;touch-action:none}
-.exploring #labels .lbl.poi{pointer-events:auto;cursor:pointer}
-.explhelp{position:fixed;left:max(16px,2.4vw);top:calc(84px + env(safe-area-inset-top,0px));z-index:6;display:none;max-width:min(36rem,calc(100vw - 32px));
-  background:var(--card);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:3px solid var(--brand);padding:8px 14px;font-size:13.5px;color:var(--ink-2);text-align:center;pointer-events:none}
-.exploring .explhelp:not([hidden]){display:block}
-@media (max-width:640px){
-  .tools{right:16px;top:calc(56px + env(safe-area-inset-top,0px));flex-direction:column}
-  .tbtn span{display:none} .tbtn{padding:9px}
-  .legend{left:16px;right:72px;width:auto;top:calc(56px + env(safe-area-inset-top,0px));max-height:60vh}
-  .exploring .legend{top:calc(56px + env(safe-area-inset-top,0px))}
-  .xbar{top:auto;left:50%;transform:translateX(-50%);max-width:none;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:6px;padding:5px}
-  .explhelp{top:auto;bottom:calc(70px + env(safe-area-inset-bottom,0px))}
-  .attrib{bottom:calc(62px + env(safe-area-inset-bottom,0px));font-size:10px;white-space:normal;width:calc(100vw - 32px);text-align:center}
-  .explhelp{left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
-  .keys{display:none}
-  .exploring .tools{top:calc(56px + env(safe-area-inset-top,0px))}
-  .exploring .hud{top:calc(12px + env(safe-area-inset-top,0px))}
-}
-
+.tip b{display:flex;align-items:center;gap:8px;font:700 15px/1.25 var(--font);white-space:normal}
+.tip b img{width:18px;height:21px;object-fit:contain;flex:none}
+.tip span{display:block;font-size:12.5px;color:var(--text-2);font-variant-numeric:tabular-nums}
+@media (max-width:760px){ .tip{display:none} }
+.noscene #scene,.noscene .hud,.noscene .mapctl{display:none}
 </style>
 </head>
-<body>
+<body class="m-home">
 
-<canvas id="scene" aria-hidden="true" tabindex="-1"></canvas>
+<canvas id="scene" aria-label="3D-Karte der Schweiz. Ziehen verschiebt, rechte Maustaste oder zwei Finger drehen, Mausrad oder zwei Finger zoomen." tabindex="0"></canvas>
 <div id="labels" aria-hidden="true"></div>
-<div class="progress" aria-hidden="true"><span id="prog"></span></div>
-<div class="mark" id="mark" aria-hidden="true"><img id="markW" src="data/wappen/CH.svg" alt=""><span><span id="markT">Schweizer</span> <i>Familien</i></span></div>
-<a class="pick" href="#kantone" id="pick"><img id="pickW" src="data/wappen/CH.svg" alt=""><span id="pickT">Kanton wählen</span></a>
 
-<nav class="nav" id="nav" aria-label="Kapitel">
-  <a href="#schweiz" data-for="schweiz"><span>Schweiz</span></a>
-  <a href="#lemanique" data-for="lemanique"><span>Genferseeregion</span></a>
-  <a href="#mittelland" data-for="mittelland"><span>Espace Mittelland</span></a>
-  <a href="#nordwest" data-for="nordwest"><span>Nordwestschweiz</span></a>
-  <a href="#zuerich" data-for="zuerich"><span>Zürich</span></a>
-  <a href="#zentral" data-for="zentral"><span>Zentralschweiz</span></a>
-  <a href="#ost" data-for="ost"><span>Ostschweiz</span></a>
-  <a href="#tessin" data-for="tessin"><span>Tessin</span></a>
-  <a href="#kantone" data-for="kantone"><span>Kantone</span></a>
-</nav>
+<header class="top">
+  <a class="brand" href="#/" aria-label="Schweizer Familien, Startseite">
+    <span class="mark" id="markTile"><svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z" fill="#fff"/></svg></span>
+    <span><span id="brandT">Schweizer</span> <b>Familien</b></span>
+  </a>
+  <nav class="tabs" id="tabs" aria-label="Bereiche">
+    <a href="#/" class="t-home" data-mode="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg><span>Start</span></a>
+    <a href="#/kantone" data-mode="kantone"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16v8c0 5.2-3.4 8.6-8 10-4.6-1.4-8-4.8-8-10zm2 2v6c0 4 2.4 6.7 6 7.9 3.6-1.2 6-3.9 6-7.9V5zm4.5 1.5h3v3h3v3h-3v3h-3v-3h-3v-3h3z"/></svg><span>Kantone</span></a>
+    <a href="#/wahrzeichen" data-mode="wahrzeichen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.2 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg><span>Wahrzeichen</span></a>
+    <a href="#/familien" data-mode="familien"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2.5a2.4 2.4 0 1 1 0 4.8a2.4 2.4 0 1 1 0-4.8zM17 4.5a2 2 0 1 1 0 4a2 2 0 1 1 0-4zM4.5 8.6h5l1.6 6.4H9.6V22H6.4v-7H3zM14.6 10h4.8l1.6 5.4h-1.4V22h-2.6v-4h-1v4h-2.6v-6.6H12z"/></svg><span>Familien</span></a>
+    <a href="#/wandern" data-mode="wandern"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM10 8.2l3-1.2 2.3 3.1 3 1.1-.7 1.9-3.6-1.3-.9-1.2-.8 3.7 2.2 2.4V22h-2v-5.4l-2.4-2.4-.9 3.8L6.4 22l-1.7-1.1 3.4-4.3 1.1-5.3-1.4.6V14h-2V10.6z"/></svg><span>Wandern</span></a>
+  </nav>
+  <a href="#/info" class="info-btn" aria-label="Impressum und Daten"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 10h2v8h-2zm0-4h2v2h-2z"/></svg></a>
+</header>
 
-<div class="hud" aria-hidden="true">
-  <svg viewBox="0 0 34 34" id="north"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".35"/><path d="M17 5 L21.5 18 L17 15.6 L12.5 18 Z" fill="var(--brand)"/><path d="M17 29 L12.5 18 L17 20.4 L21.5 18 Z" fill="currentColor" fill-opacity=".35"/><text x="17" y="4.2" text-anchor="middle" font-size="5.5" font-family="IBM Plex Mono, monospace" fill="currentColor">N</text></svg>
-  <div><span class="st" id="hudA">Höhenmodell wird geladen …</span><span class="st" id="hudB">swissALTIRegio · LV95</span></div>
-</div>
-
-
-<div class="tools" id="tools">
-  <button type="button" class="tbtn" id="layersBtn" aria-expanded="false" aria-controls="legend"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>Ebenen</span></button>
-  <button type="button" class="tbtn" id="exploreBtn" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.8 5.2 9 9 5.2 10.8 7 7z" fill="currentColor"/></svg><span>Karte erkunden</span></button>
-</div>
-<aside class="legend" id="legend" hidden aria-label="Ebenen">
-  <header><b>Ebenen</b><button type="button" id="legendClose" aria-label="Ebenen schliessen">×</button></header>
-  <div id="legendBody"></div>
-  <p class="lg-src">Luftbild SWISSIMAGE und Wanderwege © swisstopo, Wanderrouten © SchweizMobil/ASTRA, Bahnhöfe und Bergbahnen © BAV, weitere Punkte © OpenStreetMap-Mitwirkende (ODbL). Luftbild und Wanderwege erscheinen beim Heranzoomen.</p>
-</aside>
-<div class="xbar" id="xbar" role="toolbar" aria-label="Kamera">
-  <div class="seg" id="modeSeg" role="group" aria-label="Bewegungsart">
-    <button type="button" data-mode="orbit" aria-pressed="true">Umkreisen</button>
-    <button type="button" data-mode="fly" aria-pressed="false">Frei fliegen</button>
+<section class="home" id="home" aria-labelledby="homeTitle">
+  <div class="fade" aria-hidden="true"></div>
+  <div class="inner">
+    <div class="wrap">
+      <div class="headline">
+        <div>
+          <span class="pill" id="homePill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zm0 4.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/></svg><span id="homePillT">Schweiz · 26 Kantone</span></span>
+          <h1 id="homeTitle"><span id="homeT1">Schweizer</span> <span class="hl">Familien</span></h1>
+        </div>
+        <p class="lead">Die ganze Schweiz als Relief aus den Höhendaten von swisstopo, beim Heranzoomen mit Luftbild und Wanderwegen. Wählen Sie einen Bereich oder Ihren Kanton: Die Karte fliegt hin, die Seite übernimmt seine Farben.</p>
+      </div>
+      <nav class="entries" aria-label="Einstiege">
+        <a class="entry" href="#/kantone"><span class="ei"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16v8c0 5.2-3.4 8.6-8 10-4.6-1.4-8-4.8-8-10zm2 2v6c0 4 2.4 6.7 6 7.9 3.6-1.2 6-3.9 6-7.9V5zm4.5 1.5h3v3h3v3h-3v3h-3v-3h-3v-3h3z"/></svg></span><b>Kantone</b><span class="d">Wappen, Zahlen und Wahrzeichen aller 26 Kantone</span><small>26</small><span class="go" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5-1.4-1.4L8.2 8 4.6 4.4z"/></svg></span></a>
+        <a class="entry" href="#/wahrzeichen"><span class="ei"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.2 5.8 20.9l1.6-7L2 9.2l7.1-.6z"/></svg></span><b>Wahr&shy;zeichen</b><span class="d">Burgen, Kirchen, Gipfel und Wasserfälle, animiert in 3D</span><small id="nMarks"></small><span class="go" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5-1.4-1.4L8.2 8 4.6 4.4z"/></svg></span></a>
+        <a class="entry" href="#/familien"><span class="ei"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2.5a2.4 2.4 0 1 1 0 4.8a2.4 2.4 0 1 1 0-4.8zM17 4.5a2 2 0 1 1 0 4a2 2 0 1 1 0-4zM4.5 8.6h5l1.6 6.4H9.6V22H6.4v-7H3zM14.6 10h4.8l1.6 5.4h-1.4V22h-2.6v-4h-1v4h-2.6v-6.6H12z"/></svg></span><b>Für Familien</b><span class="d">Spielplätze, Badis, Bahnhöfe, Feuerstellen und mehr</span><small id="nPoi"></small><span class="go" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5-1.4-1.4L8.2 8 4.6 4.4z"/></svg></span></a>
+        <a class="entry" href="#/wandern"><span class="ei"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM10 8.2l3-1.2 2.3 3.1 3 1.1-.7 1.9-3.6-1.3-.9-1.2-.8 3.7 2.2 2.4V22h-2v-5.4l-2.4-2.4-.9 3.8L6.4 22l-1.7-1.1 3.4-4.3 1.1-5.3-1.4.6V14h-2V10.6z"/></svg></span><b>Wandern</b><span class="d">Routen von SchweizMobil, Wanderwege beim Heranzoomen</span><small id="nRoutes"></small><span class="go" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5-1.4-1.4L8.2 8 4.6 4.4z"/></svg></span></a>
+      </nav>
+      <div class="row">
+        <button type="button" class="btn btn-ghost" id="tourBtn"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z"/></svg>Rundflug durch die Schweiz</button>
+        <button type="button" class="btn btn-soft" id="flyBtnHome"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15.5v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5V18.5l-2 1.5V21.5l3.5-1 3.5 1V20l-2-1.5V13z"/></svg>Frei fliegen</button>
+        <span class="status" id="status"></span>
+        <div class="wstrip" id="wstrip" role="group" aria-label="Kanton wählen"></div>
+      </div>
+    </div>
   </div>
-  <span class="keys" id="keysOrbit">Ziehen: drehen · Rechts/Shift: verschieben · Rad: zoomen · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>Q</kbd><kbd>E</kbd></span>
-  <span class="keys" id="keysFly" hidden>Klick: Maus fangen · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fliegen · <kbd>E</kbd>/<kbd>Q</kbd> hoch/runter · <kbd>Shift</kbd> schneller · Rad: Tempo · <kbd>Esc</kbd></span>
+</section>
+
+<section class="caption" id="caption" hidden aria-live="polite">
+  <div class="bar"><i id="capBar"></i></div>
+  <span class="pill" id="capKick"></span>
+  <h2 id="capTitle"></h2>
+  <p id="capText"></p>
+  <div class="wl" id="capW" aria-hidden="true"></div>
+  <div class="crow"><span id="capStep" class="num"></span><span class="btns"><button type="button" class="btn btn-soft" id="capPrev">Zurück</button><button type="button" class="btn btn-primary" id="capNext">Weiter</button><button type="button" class="btn btn-soft" id="capStop">Beenden</button></span></div>
+</section>
+
+<aside class="panel" id="panel" aria-label="Inhalt">
+  <button class="handle" id="handle" type="button" aria-label="Panel grösser oder kleiner"></button>
+  <div class="ph" id="ph"></div>
+  <div class="pscroll" id="pscroll">
+    <div class="list" id="list"></div>
+    <div class="detail" id="detail" hidden></div>
+  </div>
+  <div class="pfoot"><span id="pfootL"></span><a href="#/info">Impressum &amp; Daten</a></div>
+</aside>
+
+<div class="mapctl" id="mapctl" role="group" aria-label="Kartensteuerung">
+  <div class="grp2">
+    <button type="button" id="zoomIn" aria-label="Näher heran">+</button>
+    <button type="button" id="zoomOut" aria-label="Weiter weg">−</button>
+  </div>
+  <div class="grp2">
+    <button type="button" id="homeBtn" aria-label="Ganze Schweiz"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg></button>
+    <button type="button" id="northBtn" aria-label="Nach Norden ausrichten"><svg class="ic" viewBox="0 0 34 34" id="north" aria-hidden="true"><path d="M17 3 L22.5 18 L17 15.2 L11.5 18 Z" fill="var(--brand)"/><path d="M17 31 L11.5 18 L17 20.8 L22.5 18 Z" fill="currentColor" fill-opacity=".4"/></svg></button>
+  </div>
+  <div class="grp2">
+    <button type="button" id="tSat" aria-pressed="true" aria-label="Luftbild beim Heranzoomen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 12h14l-4.5-6-3.5 4.5-2.5-3z"/></svg></button>
+    <button type="button" id="tLayers" aria-expanded="false" aria-controls="legend" aria-label="Ebenen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1.5 7.5 12 13l10.5-5.5zM4.3 11.3 1.5 12.8 12 18.3l10.5-5.5-2.8-1.5L12 15.3z"/></svg></button>
+    <button type="button" id="tFly" aria-pressed="false" aria-label="Frei fliegen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15.5v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5V18.5l-2 1.5V21.5l3.5-1 3.5 1V20l-2-1.5V13z"/></svg></button>
+  </div>
 </div>
-<div class="explhelp" id="explHelp" hidden>Freie Kamera. Mit „Frei fliegen“ steuern Sie wie in einem Spiel, Blick 360° mit der Maus. Beim Heranzoomen erscheinen Luftbild und Wanderwege.</div>
-<div class="attrib" aria-hidden="true">Luftbild, Wanderwege © swisstopo · Punkte © OpenStreetMap-Mitwirkende, BAV</div>
+
+<aside class="pop" id="legend" role="dialog" aria-modal="false" aria-labelledby="legendTitle">
+  <button type="button" class="x" id="legendClose" aria-label="Ebenen schliessen">×</button>
+  <h4 id="legendTitle">Ebenen</h4>
+  <div id="legendBody"></div>
+  <p class="lg-src">Luftbild SWISSIMAGE und Wanderwege © swisstopo, Wanderrouten © SchweizMobil/ASTRA, Bahnhöfe und Bergbahnen © BAV, weitere Punkte © OpenStreetMap-Mitwirkende (ODbL).</p>
+</aside>
+
+<div class="flybar" id="flybar" role="toolbar" aria-label="Freier Flug">
+  <span class="keys" id="flyKeys"></span>
+  <button type="button" class="btn btn-primary" id="flyExit">Landen</button>
+</div>
 <div class="joy" id="joy" hidden aria-hidden="true"><span id="joyKnob"></span></div>
-<div class="flybtns" aria-hidden="true"><button type="button" id="flyUp">▲</button><button type="button" id="flyDown">▼</button></div>
+<div class="flybtns" aria-hidden="true"><button type="button" id="flyUp" tabindex="-1">▲</button><button type="button" id="flyDown" tabindex="-1">▼</button></div>
+
+<div class="hud" aria-hidden="true"><span class="st" id="hudA">Höhenmodell wird geladen …</span><span class="st" id="hudB">swissALTIRegio · LV95</span></div>
+<div class="attrib" id="attrib" aria-hidden="true">Luftbild, Wanderwege © swisstopo</div>
+<div class="hint" id="hint" aria-hidden="true">Ziehen verschiebt · rechte Maustaste dreht · Mausrad zoomt</div>
 <div class="tip" id="tip" role="status" aria-live="polite"><b id="tipT"></b><span id="tipA"></span><span id="tipB"></span></div>
 
-<main>
-  <section class="hero" data-cam="hero" id="top">
-    <div aria-hidden="true"></div>
-    <div class="band">
-      <div class="wrap">
-        <div class="eyebrow"><img id="heroW" src="data/wappen/CH.svg" alt=""><span id="heroE">Schweiz · 46° 48′ N · 8° 14′ O</span></div>
-        <h1 id="heroT">Schweizer Familien</h1>
+<div class="info-dlg" id="infoDlg" hidden role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+  <div class="box">
+    <button class="x" type="button" id="infoClose" aria-label="Schliessen">×</button>
+    <h2 id="infoTitle">Impressum und Daten</h2>
+    <div class="cols">
+      <div>
+        <h3>Impressum</h3>
+        <address>Hartmann Association<br>6300 Zug</address>
+        <p style="margin-top:10px">Die ganze Schweiz auf einer Karte: Kantone mit Wappen und Farben, Wahrzeichen in 3D, Orte für Familien und Wanderrouten. Keine offizielle Seite der Kantone.</p>
+      </div>
+      <div>
+        <h3>Geodaten</h3>
+        <p>Bundesamt für Landestopografie swisstopo: Höhenmodell swissALTIRegio (10&nbsp;m; Übersicht auf 250&nbsp;m gemittelt, Nahansicht 40&nbsp;m), Grenzen, Flächen und Einwohnerzahlen aus swissBOUNDARIES3D (Stand 2026), Seen, Wald und Flüsse aus swissTLMRegio, Luftbild SWISSIMAGE und Wanderwege live aus dem WMTS.</p>
+        <p>Wanderrouten: SchweizMobil/ASTRA (Wanderland). Bahnhöfe und Bergbahnen: Bundesamt für Verkehr BAV.</p>
+        <p>Spielplätze, Badis, Zoos, Museen, Feuerstellen, Campingplätze, Aussichtspunkte und Spitäler: © <a href="https://www.openstreetmap.org/copyright" rel="noopener" target="_blank">OpenStreetMap-Mitwirkende</a>, ODbL.</p>
+      </div>
+      <div>
+        <h3>Wappen und Modelle</h3>
+        <p>Kantonswappen: Wikimedia Commons, gemeinfrei. Die Farben der Seite lehnen sich an die Wappen an.</p>
+        <p>Die 3D-Wahrzeichen sind vereinfachte Modelle, nicht massstäblich. Sie wachsen mit dem Abstand, damit sie aus der Ferne lesbar bleiben.</p>
+      </div>
+      <div>
+        <h3>Methode</h3>
+        <p>Höhen im Relief 2-fach überhöht. Höchste und tiefste Punkte der Kantone sind aus dem Höhenmodell berechnet und können von amtlichen Kotenangaben um wenige Meter abweichen. Koordinaten im Landeskoordinatensystem LV95.</p>
       </div>
     </div>
-    <div class="under">
-      <div class="wrap">
-        <p class="lead">Ein Relief der Schweiz aus den Höhendaten von swisstopo, mit allen 26 Kantonen und ihren Wahrzeichen. Wählen Sie Ihren Kanton: Die Seite übernimmt seine Farben. Mit „Karte erkunden“ fliegen Sie frei über das Land, bis hinunter aufs Luftbild.</p>
-        <div>
-          <div class="cue">Scrollen</div>
-          <div class="status" id="status"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="schweiz" id="schweiz">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Die Schweiz</p>
-        <h2 id="chH">26 Kantone</h2>
-        <p id="chP">Vom Lago Maggiore bis zur Dufourspitze. Die Linien zeigen die Landesgrenze und die Grenzen der Kantone nach swissBOUNDARIES3D, Stand 2026.</p>
-        <p class="hint hint-hover">Fahren Sie mit der Maus über das Relief, um einen Kanton zu sehen.</p>
-        <dl class="facts" id="chFacts"></dl>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="lemanique" id="lemanique">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Genferseeregion · Waadt · Wallis · Genf</p>
-        <h2>Vom Genfersee ins Rhonetal</h2>
-        <p>Die Rhone entspringt am Rhonegletscher, durchfliesst das Wallis und mündet zwischen Le Bouveret und Villeneuve in den Genfersee. Im Kanton Genf verlässt sie die Schweiz. Im Wallis steht mit der Dufourspitze der höchste Gipfel des Landes, am Nordufer des Sees liegen zwischen Lausanne und Vevey die Rebterrassen des Lavaux.</p>
-        <ul class="rows" data-rows="lemanique"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="mittelland" id="mittelland">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Espace Mittelland · Bern · Freiburg · Solothurn · Neuenburg · Jura</p>
-        <h2>Vom Oberland bis an den Doubs</h2>
-        <p>Die Region reicht von den Gletschern des Berner Oberlands über das Mittelland bis in die Ketten des Juras. Durch sie verläuft die Sprachgrenze: Bern und Freiburg sind zweisprachig, Neuenburg und Jura französischsprachig. In Bern tagen Bundesrat und Parlament.</p>
-        <ul class="rows" data-rows="mittelland"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="nordwest" id="nordwest">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Nordwestschweiz · Basel-Stadt · Basel-Landschaft · Aargau</p>
-        <h2>Am Rheinknie</h2>
-        <p>Bei Basel wendet sich der Rhein nach Norden. Am Dreiländereck treffen die Schweiz, Deutschland und Frankreich aufeinander. Im Aargau vereinigen sich Aare, Reuss und Limmat; die Gegend um Brugg heisst deshalb Wasserschloss der Schweiz.</p>
-        <ul class="rows" data-rows="nordwest"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="zuerich" id="zuerich">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Zürich</p>
-        <h2>Ein Kanton als eigene Grossregion</h2>
-        <p>Kein Kanton zählt mehr Einwohner. Er reicht vom Rhein im Norden über das Weinland bis ins Zürcher Oberland. Die Stadt Zürich liegt am Ausfluss der Limmat aus dem See.</p>
-        <ul class="rows" data-rows="zuerich"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="zentral" id="zentral">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Zentralschweiz · Luzern · Uri · Schwyz · Obwalden · Nidwalden · Zug</p>
-        <h2>Rund um den Vierwaldstättersee</h2>
-        <p>Uri, Schwyz und Unterwalden schlossen sich zum ersten Bund der Eidgenossenschaft zusammen. Der Bundesbrief ist auf Anfang August 1291 datiert; die Überlieferung verlegt den Schwur auf das Rütli am Urnersee.</p>
-        <ul class="rows" data-rows="zentral"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="ost" id="ost">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Ostschweiz · Glarus · Schaffhausen · Appenzell · St. Gallen · Graubünden · Thurgau</p>
-        <h2>Vom Bodensee bis ins Engadin</h2>
-        <p>Sieben Kantone, darunter Graubünden, der flächengrösste der Schweiz und der einzige mit drei Amtssprachen. Der Säntis überragt das Appenzellerland; im Süden erreicht die Region am Piz Bernina über 4000&nbsp;m.</p>
-        <ul class="rows" data-rows="ost"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="chapter" data-cam="tessin" id="tessin">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Tessin</p>
-        <h2>Südlich des Gotthards</h2>
-        <p>Das Tessin ist der einzige Kanton mit Italienisch als alleiniger Amtssprache. Am Lago Maggiore liegt auf 193&nbsp;m ü.&nbsp;M. der tiefste Punkt der Schweiz, keine 50&nbsp;km Luftlinie vom Rheinwaldhorn auf 3402&nbsp;m entfernt.</p>
-        <ul class="rows" data-rows="tessin"></ul>
-      </article>
-    </div>
-  </section>
-
-  <section class="finale" data-cam="kantone" id="kantone">
-    <div class="wrap">
-      <article class="card">
-        <p class="kicker">Alle Kantone</p>
-        <h2>Wählen Sie Ihren Kanton</h2>
-        <p>Die Seite übernimmt Wappen und Farben des Kantons, die Kamera fliegt hin.<span class="hint-hover"> Mit gedrückter Maustaste drehen Sie die Ansicht.</span></p>
-        <div class="tiles" id="tiles" role="group" aria-label="Kantone der Schweiz"></div>
-        <div class="detail" id="detail" aria-live="polite"></div>
-      </article>
-    </div>
-  </section>
-</main>
-
-<footer>
-  <div class="wrap">
-    <div class="sig" id="sig">Schweizer Familien</div>
-    <p>Daten: Bundesamt für Landestopografie swisstopo. Höhenmodell swissALTIRegio (10&nbsp;m, hier auf 250&nbsp;m gemittelt), Grenzen, Flächen und Einwohnerzahlen aus swissBOUNDARIES3D (Stand 2026), Seen, Wald und Flüsse aus swissTLMRegio. Höchste und tiefste Punkte sind aus dem Höhenmodell berechnet und können von amtlichen Kotenangaben um wenige Meter abweichen. Höhen im Relief 2-fach überhöht, Koordinaten im Schweizer Landeskoordinatensystem LV95.</p>
-    <p>Nahansicht: Höhenkacheln aus swissALTIRegio (40&nbsp;m), Luftbild SWISSIMAGE und Wanderwege live aus dem WMTS von swisstopo. Wanderrouten: SchweizMobil/ASTRA. Bahnhöfe und Bergbahnen: Bundesamt für Verkehr. Spielplätze, Badis, Zoos, Museen, Feuerstellen, Campingplätze, Aussichtspunkte und Spitäler: © OpenStreetMap-Mitwirkende, Lizenz ODbL. Die 3D-Wahrzeichen sind vereinfachte Modelle, nicht massstäblich.</p>
-    <p>Wappen: Wikimedia Commons, gemeinfrei. Kantonsfarben an die Wappen angelehnt; keine offizielle Seite der Kantone.</p>
-    <p>© swisstopo</p>
   </div>
-</footer>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script src="kantone.js"></script>

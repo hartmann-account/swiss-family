@@ -2,23 +2,35 @@
 'use strict';
 var KT = window.KANTONE, KC = KT.C;
 var $ = function (s) { return document.querySelector(s); };
-var root = document.documentElement;
+var root = document.documentElement, body = document.body;
 var statusEl = $('#status'), hudA = $('#hudA'), hudB = $('#hudB');
 var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 var TEST = !!window.SF_TEST;
 var fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+var narrowMQ = matchMedia('(max-width: 760px)');
+if (!fine) body.classList.add('touch');
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
 function lerp(a, b, t) { return a + (b - a) * t; }
 function sstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 function swiss(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '’'); }
 function dec(x, d) { return x.toFixed(d == null ? 1 : d).replace('.', ','); }
 function km2(ha) { return ha >= 100000 ? swiss(ha / 100) : dec(ha / 100); }
-function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function km(m) { return m >= 100000 ? swiss(m / 1000) : dec(m / 1000); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function wappen(code) { return 'data/wappen/' + code + '.svg'; }
 function shade(hex, f) {
   var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   return '#' + [r, g, b].map(function (v) { return ('0' + Math.round(v * f).toString(16)).slice(-2); }).join('');
 }
+/* LV95 nach WGS84, Näherungsformeln von swisstopo (Genauigkeit rund 1 m) */
+function wgs(E, N) {
+  var y = (E - 2600000) / 1e6, x = (N - 1200000) / 1e6;
+  var lon = 2.6779094 + 4.728982 * y + 0.791484 * y * x + 0.1306 * y * x * x - 0.0436 * y * y * y;
+  var lat = 16.9023892 + 3.238272 * x - 0.270978 * y * y - 0.002528 * x * x - 0.0447 * y * y * x - 0.0140 * x * x * x;
+  return [lat * 100 / 36, lon * 100 / 36];
+}
+function geoAdminURL(E, N) { return 'https://map.geo.admin.ch/?lang=de&E=' + Math.round(E) + '&N=' + Math.round(N) + '&zoom=10&crosshair=marker'; }
+function osmURL(E, N) { var w = wgs(E, N), a = w[0].toFixed(5), o = w[1].toFixed(5); return 'https://www.openstreetmap.org/?mlat=' + a + '&mlon=' + o + '#map=17/' + a + '/' + o; }
 
 /* ---------------- Kantonsfarben als CSS ---------------- */
 (function themeCSS() {
@@ -42,126 +54,27 @@ function shade(hex, f) {
   var st = document.createElement('style'); st.id = 'kantonfarben'; st.textContent = css; document.head.appendChild(st);
 })();
 
-/* ---------------- Daten laden ---------------- */
-function fail(msg) {
-  root.classList.add('noscene');
-  statusEl.textContent = msg; hudA.textContent = 'Relief nicht verfügbar'; hudB.textContent = '';
-}
-function gunzip(buf) {
-  var ds = new DecompressionStream('gzip');
-  return new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer().then(function (b) { return new Uint8Array(b); });
-}
-function loadImage(src) { return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = rej; im.src = src; }); }
-function tick() { return new Promise(function (r) { setTimeout(r, 0); }); }
+/* ---------------- Symbole ---------------- */
+var ICON = {
+  kanton: 'M4 3h16v8c0 5.2-3.4 8.6-8 10-4.6-1.4-8-4.8-8-10zm2 2v6c0 4 2.4 6.7 6 7.9 3.6-1.2 6-3.9 6-7.9V5zm4.5 1.5h3v3h3v3h-3v3h-3v-3h-3v-3h3z',
+  star: 'M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.2 5.8 20.9l1.6-7L2 9.2l7.1-.6z',
+  family: 'M7 2.5a2.4 2.4 0 1 1 0 4.8a2.4 2.4 0 1 1 0-4.8zM17 4.5a2 2 0 1 1 0 4a2 2 0 1 1 0-4zM4.5 8.6h5l1.6 6.4H9.6V22H6.4v-7H3zM14.6 10h4.8l1.6 5.4h-1.4V22h-2.6v-4h-1v4h-2.6v-6.6H12z',
+  hike: 'M13.5 2.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM10 8.2l3-1.2 2.3 3.1 3 1.1-.7 1.9-3.6-1.3-.9-1.2-.8 3.7 2.2 2.4V22h-2v-5.4l-2.4-2.4-.9 3.8L6.4 22l-1.7-1.1 3.4-4.3 1.1-5.3-1.4.6V14h-2V10.6z',
+  back: 'M10 3 5 8l5 5 1.4-1.4L7.8 8l3.6-3.6z',
+  fly: 'M21 15.5v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V8.5l-8 5v2l8-2.5V18.5l-2 1.5V21.5l3.5-1 3.5 1V20l-2-1.5V13z',
+  map: 'M9 3 3 5.2v15.6l6-2.2 6 2.2 6-2.2V3l-6 2.2zm1 2.2 4 1.5v12.1l-4-1.5zM5 6.6l3-1.1v12.1l-3 1.1zm11 .1 3-1.1v12.1l-3 1.1z',
+  zoom: 'M10 3a7 7 0 0 1 5.6 11.2l5.6 5.6-1.4 1.4-5.6-5.6A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-1 2h2v2h2v2h-2v2H9v-2H7V9h2z',
+  kirche: 'M11 1h2v2h2v2h-2v2.2l5 3.8V22h-4v-5a2 2 0 0 0-4 0v5H6V11l5-3.8V5H9V3h2z',
+  burg: 'M3 21V8h3V5h2v3h3V5h2v3h3V5h2v3h3v13h-7v-5a2 2 0 0 0-4 0v5z',
+  berg: 'M2 20 9 7l3.5 6 2.5-4L22 20z',
+  wasser: 'M12 2s7 7.6 7 12.2A7 7 0 0 1 5 14.2C5 9.6 12 2 12 2zm-3.6 12.4a3.6 3.6 0 0 0 3.6 3.6v-2a1.6 1.6 0 0 1-1.6-1.6z',
+  ort: 'M3 21V10l6-4 6 4v1h6v10zm4-2h2v-3H7zm4 0h2v-3h-2zm6 0h2v-3h-2z',
+  denkmal: 'M10 2h4v4h-1v8h3l2 4v4H6v-4l2-4h3V6h-1z'
+};
+function svgIcon(k, cls) { return '<svg' + (cls ? ' class="' + cls + '"' : '') + ' viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICON[k] + '"/></svg>'; }
+function backBtn(label) { return '<button type="button" class="back" id="back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + ICON.back + '"/></svg>' + esc(label) + '</button>'; }
 
-var D = null, BYCODE = {}, BYID = [], MARKS = {};
-var hgtP = fetch('data/hgt.bin').then(function (r) { if (!r.ok) throw new Error('hgt ' + r.status); return r.arrayBuffer(); });
-hgtP.catch(function () {});
-function getJSON(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
-var poiP = getJSON('data/poi.json'), routesP = getJSON('data/routes.json');
-poiP.catch(function () {}); routesP.catch(function () {});
-var geoP = fetch('data/geo.json').then(function (r) { if (!r.ok) throw new Error('geo ' + r.status); return r.json(); });
-
-geoP.then(function (g) {
-  D = g;
-  D.cantons.forEach(function (c) { BYCODE[c.code] = c; BYID[c.id] = c; });
-  var pm = (D.places && D.places.marks) || {};
-  KT.ORDER.forEach(function (code) {
-    MARKS[code] = (KC[code].marks || []).map(function (m, i) {
-      var p = (pm[code] || []).filter(function (x) { return x.name === m[0]; })[0] || (pm[code] || [])[i];
-      return p ? { name: m[0], text: m[1], E: p.E, N: p.N, idx: i, code: code } : null;
-    }).filter(Boolean);
-  });
-  fillText();
-  start();
-}).catch(function (e) { console.error(e); fail('Die Geodaten konnten nicht geladen werden.'); });
-
-/* ---------------- Texte aus den Daten ---------------- */
-var tilesEl = $('#tiles'), detailEl = $('#detail');
-function fillText() {
-  var ch = D.ch;
-  $('#chH').textContent = '26 Kantone auf ' + swiss(ch.ha / 100) + ' km²';
-  $('#chP').textContent = 'Vom Lago Maggiore auf ' + ch.hmin + ' m ü. M. bis zur Dufourspitze auf ' + ch.hmax + ' m. Die Linien zeigen die Landesgrenze und die Grenzen der Kantone nach swissBOUNDARIES3D, Stand 2026.';
-  $('#chFacts').innerHTML = [['Fläche', swiss(ch.ha / 100) + ' km²'], ['Höhenlage', ch.hmin + '–' + swiss(ch.hmax) + ' m'], ['Einwohner', swiss(ch.pop)],
-    ['Kantone', '26'], ['Gemeinden', swiss(ch.gem)]].map(function (f) { return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>'; }).join('');
-  Array.prototype.forEach.call(document.querySelectorAll('[data-rows]'), function (ul) {
-    ul.innerHTML = KT.REGIONS[ul.dataset.rows].map(function (code) {
-      var c = BYCODE[code];
-      return '<li><span><img src="' + wappen(code) + '" alt="">' + KC[code].name + '</span><span>' + km2(c.ha) + ' km² · ' + swiss(c.pop) + ' Einw.</span></li>';
-    }).join('');
-  });
-  tilesEl.innerHTML = KT.ORDER.map(function (code) {
-    return '<button type="button" data-k="' + code + '" aria-pressed="false" title="' + esc(KC[code].name) + '" aria-label="' + esc(KC[code].name) + '"><img src="' + wappen(code) + '" alt="">' + code + '</button>';
-  }).join('') + '<button type="button" class="all" data-k="CH" aria-pressed="true" title="Ganze Schweiz" aria-label="Ganze Schweiz"><img src="' + wappen('CH') + '" alt="">CH</button>';
-  renderDetail();
-}
-function renderDetail() {
-  var code = selected ? selected.code : null;
-  if (!code) {
-    detailEl.innerHTML = '<p class="sel">Für Familien in allen 26 Kantonen. Wählen Sie oben einen Kanton.</p>';
-    return;
-  }
-  var K = KC[code], c = BYCODE[code];
-  var marks = MARKS[code] || [];
-  detailEl.innerHTML =
-    '<div class="dhead"><img src="' + wappen(code) + '" alt="Wappen ' + esc(K.name) + '"><div><h3>' + esc(K.name) + '</h3><p>' + esc(K.local) + '</p></div></div>' +
-    '<div class="flagbar" aria-hidden="true"></div>' +
-    '<dl class="facts">' +
-    [['Hauptort', K.capital], [K.sinceNote ? 'Kanton seit' : 'Im Bund seit', K.since], ['Amtssprache' + (K.lang.indexOf(',') > 0 ? 'n' : ''), K.lang],
-     ['Fläche', km2(c.ha) + ' km²'], ['Einwohner', swiss(c.pop)], ['Gemeinden', String(c.gem)], ['Höhenlage', c.hmin + '–' + swiss(c.hmax) + ' m']]
-      .map(function (f) { return '<div><dt>' + f[0] + '</dt><dd>' + esc(f[1]) + '</dd></div>'; }).join('') +
-    '</dl>' +
-    '<button type="button" class="xgo" data-x="1"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.8 5.2 9 9 5.2 10.8 7 7z" fill="currentColor"/></svg>' + esc(K.name) + ' in 3D erkunden</button>' +
-    '<p class="kicker" style="margin:18px 0 0">Wahrzeichen</p>' +
-    '<ul class="marks">' + marks.map(function (m, i) {
-      return '<li><button type="button" data-m="' + i + '" aria-pressed="' + (selMark === i ? 'true' : 'false') + '"><b>' + esc(m.name) + '</b><small>' + esc(m.text) + '</small></button></li>';
-    }).join('') + '</ul>';
-}
-
-/* ---------------- Auswahl und Farbwechsel ---------------- */
-var selected = null, selMark = -1;
-function applyBrand(code) {
-  if (code && code !== 'CH') root.setAttribute('data-kanton', code); else root.removeAttribute('data-kanton');
-  var K = KC[code || 'CH'];
-  var t = K.title + ' Familien';
-  $('#heroT').textContent = t; $('#markT').textContent = K.title; $('#sig').textContent = t;
-  document.title = t;
-  ['#heroW', '#markW', '#pickW'].forEach(function (s) { $(s).src = wappen(code || 'CH'); });
-  $('#heroE').textContent = code && code !== 'CH' ? 'Kanton ' + K.name + ' · ' + (K.sinceNote || 'im Bund seit ' + K.since) : 'Schweiz · 46° 48′ N · 8° 14′ O';
-  $('#pickT').textContent = code && code !== 'CH' ? K.name : 'Kanton wählen';
-  var meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) { meta = document.createElement('meta'); meta.name = 'theme-color'; document.head.appendChild(meta); }
-  meta.content = K.color.brand;
-}
-function selectCanton(code, opts) {
-  opts = opts || {};
-  var c = code && code !== 'CH' ? BYCODE[code] : null;
-  selected = c; selMark = -1;
-  applyBrand(c ? c.code : null);
-  Array.prototype.forEach.call(tilesEl.querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', (c ? c.code : 'CH') === b.dataset.k ? 'true' : 'false'); });
-  renderDetail();
-  if (!opts.noHash) { try { history.replaceState(null, '', c ? '#' + c.code.toLowerCase() : location.pathname + location.search); } catch (e) {} }
-  if (window.__onSelect) window.__onSelect(c);
-  if (opts.scroll && !inFinale()) document.getElementById('kantone').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
-}
-tilesEl.addEventListener('click', function (e) {
-  var b = e.target.closest('button[data-k]'); if (!b) return;
-  var code = b.dataset.k;
-  selectCanton(code === 'CH' || (selected && selected.code === code) ? null : code, { scroll: true });
-});
-var exploreAt = function () {};
-detailEl.addEventListener('click', function (e) {
-  if (e.target.closest('button[data-x]') && selected) { setExplore(true, 'orbit'); exploreAt(selected); return; }
-  var b = e.target.closest('button[data-m]'); if (!b) return;
-  var i = +b.dataset.m;
-  selMark = selMark === i ? -1 : i;
-  Array.prototype.forEach.call(detailEl.querySelectorAll('button[data-m]'), function (x) { x.setAttribute('aria-pressed', +x.dataset.m === selMark ? 'true' : 'false'); });
-});
-function hashCanton() { var h = location.hash.replace('#', '').toUpperCase(); return KC[h] && h !== 'CH' ? h : null; }
-window.addEventListener('hashchange', function () { var h = hashCanton(); if (h && D) selectCanton(h, { noHash: true }); });
-function inFinale() { var y = window.scrollY + window.innerHeight * 0.5; return y > anchorY('kantone') - window.innerHeight * 0.45; }
-
-/* ---------------- Ebenen (Legende) ---------------- */
+/* ---------------- Ebenen ---------------- */
 var POICAT = [
   { k: 'bahn', label: 'Bahnhöfe', one: 'Bahnhof', far: 45000, color: '#D7141A', on: true },
   { k: 'play', label: 'Spielplätze', one: 'Spielplatz', far: 14000, color: '#F08A00', on: true },
@@ -174,15 +87,17 @@ var POICAT = [
   { k: 'aussicht', label: 'Aussichtspunkte', one: 'Aussichtspunkt', far: 24000, color: '#4B5568', on: false },
   { k: 'spital', label: 'Spitäler', one: 'Spital', far: 40000, color: '#1E5AA8', on: false }
 ];
+var CATBY = {}; POICAT.forEach(function (c, i) { c.i = i; CATBY[c.k] = c; });
 var LAYERS = { sat: true, trails: true, marks: true, borders: true, water: true, labels: true };
 POICAT.forEach(function (c) { LAYERS[c.k] = c.on; });
 try { var savedL = JSON.parse(localStorage.getItem('sf-layers') || 'null'); if (savedL) Object.keys(savedL).forEach(function (k) { if (k in LAYERS) LAYERS[k] = !!savedL[k]; }); } catch (e) {}
-var onLayer = function () {};
+var layerHooks = [];
 function setLayer(k, v) {
   LAYERS[k] = v;
   try { localStorage.setItem('sf-layers', JSON.stringify(LAYERS)); } catch (e) {}
   var inp = document.querySelector('#legend input[data-l="' + k + '"]'); if (inp) inp.checked = v;
-  onLayer(k, v);
+  if (k === 'sat') $('#tSat').setAttribute('aria-pressed', String(v));
+  layerHooks.forEach(function (f) { f(k, v); });
 }
 
 /* Symbole der Punktebenen: eine Leinwand 4 x 4 à 64 px */
@@ -223,68 +138,610 @@ var ICONS = (function () {
   return { canvas: cv, url: url };
 })();
 
-/* Legende aufbauen */
-(function legend() {
-  var el = $('#legendBody'); if (!el) return;
-  function row(k, label, sw) {
-    return '<label class="lg-row"><input type="checkbox" data-l="' + k + '"' + (LAYERS[k] ? ' checked' : '') + '><span class="lg-sw">' + sw + '</span><span>' + label + '</span></label>';
+/* Gruppen der Wahrzeichen, nach Modelltyp */
+var MGROUP = [
+  { k: 'kirche', label: 'Kirchen & Klöster', ic: 'kirche', types: ['church', 'church-twin', 'cathedral', 'minster', 'basilica', 'monastery', 'chapel', 'chapel-hill', 'church-rock'] },
+  { k: 'burg', label: 'Burgen & Schlösser', ic: 'burg', types: ['castle', 'castle-round', 'water-castle', 'manor', 'wall', 'tower', 'tower-clock'] },
+  { k: 'berg', label: 'Berge & Gletscher', ic: 'berg', types: ['peak', 'peak-snow', 'matterhorn', 'peak-tower', 'peak-cablecar', 'peak-rail', 'observatory', 'glacier', 'ridge', 'cirque', 'cliff-lift'] },
+  { k: 'wasser', label: 'Wasser & Schluchten', ic: 'wasser', types: ['lake', 'waterfall', 'fountain', 'dam', 'gorge', 'cave', 'confluence'] },
+  { k: 'ort', label: 'Orte & Plätze', ic: 'ort', types: ['oldtown', 'gridtown', 'village', 'square', 'meadow', 'townhall', 'park', 'vineyard', 'hut'] },
+  { k: 'denkmal', label: 'Bauwerke & Denkmäler', ic: 'denkmal', types: ['monument', 'monument-lion', 'monument-wall', 'tripoint', 'parliament', 'palace', 'museum', 'theatre', 'fossil', 'bridge-covered', 'bridge-stone', 'viaduct'] }
+];
+var GROUPOF = {}; MGROUP.forEach(function (g, i) { g.i = i; g.types.forEach(function (t) { GROUPOF[t] = i; }); });
+var REGION_NAME = { lemanique: 'Genferseeregion', mittelland: 'Espace Mittelland', nordwest: 'Nordwestschweiz', zuerich: 'Zürich', zentral: 'Zentralschweiz', ost: 'Ostschweiz', tessin: 'Tessin' };
+var REGION_ORDER = ['lemanique', 'mittelland', 'nordwest', 'zuerich', 'zentral', 'ost', 'tessin'];
+
+/* ---------------- Daten laden ---------------- */
+function fail(msg) {
+  root.classList.add('noscene');
+  statusEl.textContent = msg; hudA.textContent = 'Relief nicht verfügbar'; hudB.textContent = '';
+}
+function gunzip(buf) {
+  var ds = new DecompressionStream('gzip');
+  return new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+}
+function loadImage(src) { return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = rej; im.src = src; }); }
+function tick() { return new Promise(function (r) { setTimeout(r, 0); }); }
+function getJSON(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }); }
+
+var D = null, BYCODE = {}, BYID = [], MARKS = {}, MARKLIST = [], MARKBY = {}, POIS = [], ROUTES = [], POIDATE = '';
+var hgtP = fetch('data/hgt.bin').then(function (r) { if (!r.ok) throw new Error('hgt ' + r.status); return r.arrayBuffer(); });
+hgtP.catch(function () {});
+var poiP = getJSON('data/poi.json'), routesP = getJSON('data/routes.json');
+poiP.catch(function () {}); routesP.catch(function () {});
+
+/* Kanton eines Punkts: Begrenzungsrechteck, dann gerade/ungerade über alle Ringe (Löcher und Exklaven inbegriffen) */
+var CPOLY = [];
+function buildCantonIndex() {
+  D.cantons.forEach(function (c) {
+    var rings = (D.rings[c.code] || []).map(function (a) { var r = new Float64Array(a.length); for (var i = 0; i < a.length; i += 2) { r[i] = a[i] + D.grid.E0; r[i + 1] = a[i + 1] + D.grid.N0; } return r; });
+    CPOLY.push({ code: c.code, bb: c.bb, rings: rings });
+  });
+}
+function cantonAt(E, N) {
+  for (var k = 0; k < CPOLY.length; k++) {
+    var P = CPOLY[k], b = P.bb;
+    if (E < b[0] || E > b[2] || N < b[1] || N > b[3]) continue;
+    var inside = false;
+    for (var r = 0; r < P.rings.length; r++) {
+      var a = P.rings[r], n = a.length;
+      for (var i = 0, j = n - 2; i < n; j = i, i += 2) {
+        var yi = a[i + 1], yj = a[j + 1];
+        if ((yi > N) !== (yj > N) && E < (a[j] - a[i]) * (N - yi) / (yj - yi) + a[i]) inside = !inside;
+      }
+    }
+    if (inside) return P.code;
   }
-  el.innerHTML =
+  return '';
+}
+function inChunks(n, fn, done) {
+  var i = 0;
+  (function step() { var end = Math.min(n, i + 2500); for (; i < end; i++) fn(i); if (i < n) setTimeout(step, 0); else if (done) done(); })();
+}
+
+var geoP = getJSON('data/geo.json');
+geoP.then(function (g) {
+  D = g;
+  D.cantons.forEach(function (c) { BYCODE[c.code] = c; BYID[c.id] = c; });
+  buildCantonIndex();
+  var pm = (D.places && D.places.marks) || {};
+  KT.ORDER.forEach(function (code) {
+    MARKS[code] = (KC[code].marks || []).map(function (m, i) {
+      var p = (pm[code] || []).filter(function (x) { return x.name === m[0]; })[0] || (pm[code] || [])[i];
+      if (!p) return null;
+      var type = (window.SFModels && window.SFModels.markType[code + ':' + i]) || 'monument';
+      var it = { kind: 'mark', id: code.toLowerCase() + '-' + (i + 1), name: m[0], text: m[1], E: p.E, N: p.N, idx: i, code: code, type: type, grp: GROUPOF[type] != null ? GROUPOF[type] : 5 };
+      MARKLIST.push(it); MARKBY[it.id] = it;
+      return it;
+    }).filter(Boolean);
+  });
+  $('#nMarks').textContent = MARKLIST.length;
+  buildStrip();
+  start();
+  applyRoute();
+  poiP.then(function (P) {
+    POIDATE = P.date || '';
+    POICAT.forEach(function (c) {
+      var d = P.cats && P.cats[c.k]; if (!d) return;
+      for (var i = 0, n = d.xyz.length / 3; i < n; i++) {
+        POIS.push({ kind: 'poi', id: String(POIS.length), c: c.i, E: P.E0 + d.xyz[i * 3], N: P.N0 + d.xyz[i * 3 + 1], h: d.xyz[i * 3 + 2], name: (d.names && d.names[i]) || '', code: null });
+      }
+    });
+    $('#nPoi').textContent = swiss(POIS.length);
+    inChunks(POIS.length, function (i) { POIS[i].code = cantonAt(POIS[i].E, POIS[i].N); }, function () { POIS.ready = true; refreshMode('familien'); refreshMode('kantone'); });
+    MAP.onPOI();
+    refreshMode('familien');
+    if (SELREQ && SELREQ.mode === 'familien') applyRoute();
+  }).catch(function (e) { console.warn('Punkte', e); });
+  routesP.then(function (Rt) {
+    (Rt.routes || []).forEach(function (r, i) {
+      var lines = r.lines.map(function (a) { var o = new Float64Array(a.length); for (var k = 0; k < a.length; k += 2) { o[k] = a[k] + Rt.E0; o[k + 1] = a[k + 1] + Rt.N0; } return o; });
+      var len = 0, bb = [1e9, 1e9, -1e9, -1e9], seen = {};
+      lines.forEach(function (a) {
+        for (var k = 0; k < a.length; k += 2) {
+          if (k) len += Math.hypot(a[k] - a[k - 2], a[k + 1] - a[k - 1]);
+          bb[0] = Math.min(bb[0], a[k]); bb[1] = Math.min(bb[1], a[k + 1]); bb[2] = Math.max(bb[2], a[k]); bb[3] = Math.max(bb[3], a[k + 1]);
+          if (k % 16 === 0) { var cc = cantonAt(a[k], a[k + 1]); if (cc) seen[cc] = (seen[cc] || 0) + 1; }
+        }
+      });
+      ROUTES.push({ kind: 'route', id: String(i + 1), nr: String(r.nr), name: r.name, typ: r.typ, lines: lines, len: len, bb: bb,
+        cantons: KT.ORDER.filter(function (c) { return seen[c]; }) });
+    });
+    ROUTES.sort(function (a, b) { return (a.typ === 'national' ? 0 : 1) - (b.typ === 'national' ? 0 : 1) || (parseInt(a.nr, 10) || 999) - (parseInt(b.nr, 10) || 999) || a.name.localeCompare(b.name, 'de'); });
+    $('#nRoutes').textContent = ROUTES.length;
+    MAP.onRoutes();
+    refreshMode('wandern'); refreshMode('kantone');
+    if (SELREQ && SELREQ.mode === 'wandern') applyRoute();
+  }).catch(function (e) { console.warn('Routen', e); });
+}).catch(function (e) { console.error(e); fail('Die Geodaten konnten nicht geladen werden.'); });
+
+/* Schnittstelle zur Karte; start() füllt sie, ohne WebGL bleiben es leere Funktionen */
+var MAP = {
+  ready: false,
+  flyCanton: function () {}, flyOverview: function () {}, flyHome: function () {}, flyMark: function () {}, flyPOI: function () {}, flyRoute: function () {}, flyKey: function () {},
+  setRoute: function () {}, setHotPOI: function () {}, center: function () { return null; }, onPOI: function () {}, onRoutes: function () {},
+  startFly: function () {}, stopFly: function () {}, flying: function () { return false; }, zoom: function () {}, north: function () {}
+};
+
+/* ---------------- Zustand ---------------- */
+var MODE = 'home', SEL = null, SELREQ = null, selected = null, HOT = null, touring = false;
+var panel = $('#panel'), phEl = $('#ph'), listEl = $('#list'), detailEl = $('#detail'), pscroll = $('#pscroll');
+var filt = { kantone: { reg: '' }, wahrzeichen: { groups: MGROUP.map(function () { return true; }) }, wandern: { nat: true, reg: true }, familien: { shown: 120 } };
+var MODEPATH = { home: '', kantone: 'kantone', wahrzeichen: 'wahrzeichen', familien: 'familien', wandern: 'wandern', info: 'info' };
+var PATHMODE = {}; Object.keys(MODEPATH).forEach(function (k) { PATHMODE[MODEPATH[k]] = k; });
+var MODETITLE = { home: '', kantone: 'Kantone', wahrzeichen: 'Wahrzeichen', familien: 'Für Familien', wandern: 'Wandern' };
+
+/* ---------------- Kanton wählen: Farben, Wappen, Titel ---------------- */
+function applyBrand(code) {
+  if (code) root.setAttribute('data-kanton', code); else root.removeAttribute('data-kanton');
+  var K = KC[code || 'CH'];
+  $('#brandT').textContent = K.title; $('#homeT1').textContent = K.title;
+  var tile = $('#markTile');
+  if (code) { tile.className = 'mark wap'; tile.innerHTML = '<img src="' + wappen(code) + '" alt="">'; }
+  else { tile.className = 'mark'; tile.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z" fill="#fff"/></svg>'; }
+  $('#homePillT').textContent = code ? 'Kanton ' + K.name + ' · ' + (K.sinceNote || 'im Bund seit ' + K.since) : 'Schweiz · 26 Kantone';
+  var meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = K.color.brand;
+  Array.prototype.forEach.call(document.querySelectorAll('#wstrip button'), function (b) { b.setAttribute('aria-pressed', String((b.dataset.k || '') === (code || 'CH'))); });
+  setTitle();
+}
+function setTitle() {
+  var K = KC[selected ? selected.code : 'CH'], t = K.title + ' Familien';
+  document.title = MODE === 'home' || !MODETITLE[MODE] ? t : MODETITLE[MODE] + ' · ' + t;
+}
+function setCanton(code, opts) {
+  opts = opts || {};
+  code = code && BYCODE[String(code).toUpperCase()] ? String(code).toUpperCase() : null;
+  if ((selected ? selected.code : null) === code) return false;
+  selected = code ? BYCODE[code] : null;
+  filt.wahrzeichen.groups = MGROUP.map(function () { return true; });
+  applyBrand(code);
+  if (!opts.noRender && MODE !== 'home') { renderHead(); if (!SEL) renderList(); }
+  if (!opts.noFly && !SEL) flyContext();
+  if (!opts.noHash) syncHash();
+  return true;
+}
+function buildStrip() {
+  var el = $('#wstrip');
+  el.innerHTML = '<span>Ihr Kanton</span>' + KT.ORDER.map(function (code) {
+    return '<button type="button" data-k="' + code + '" aria-pressed="false" title="' + esc(KC[code].name) + '" aria-label="' + esc(KC[code].name) + '"><img src="' + wappen(code) + '" alt=""></button>';
+  }).join('') + '<button type="button" data-k="CH" aria-pressed="true" title="Ganze Schweiz" aria-label="Ganze Schweiz"><img src="' + wappen('CH') + '" alt=""></button>';
+  el.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-k]'); if (!b) return;
+    setCanton(b.dataset.k === 'CH' ? null : b.dataset.k, { noRender: true });
+  });
+}
+
+/* ---------------- Adresse ---------------- */
+function parseHash() {
+  var raw = decodeURI(location.hash || '');
+  var legacy = raw.match(/^#([a-z]{2})$/i);
+  if (legacy && KC[legacy[1].toUpperCase()]) return { mode: 'kantone', id: legacy[1].toLowerCase(), q: {} };
+  var h = raw.replace(/^#\/?/, ''), q = {}, qi = h.indexOf('?');
+  if (qi >= 0) { h.slice(qi + 1).split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = a[1] || ''; }); h = h.slice(0, qi); }
+  var parts = h.split('/').filter(Boolean);
+  return { mode: PATHMODE[parts[0] || ''] || 'home', id: parts[1] || null, q: q };
+}
+function hashFor(mode, id) {
+  var p = MODEPATH[mode], h = '#/' + p + (p && id ? '/' + encodeURIComponent(id) : '');
+  if (selected && !(mode === 'kantone' && id)) h += '?k=' + selected.code.toLowerCase();
+  return h;
+}
+function go(mode, id, replace) {
+  var h = hashFor(mode, id);
+  if (location.hash === h) { applyRoute(); return; }
+  if (replace) { history.replaceState(null, '', h); applyRoute(); } else location.hash = h;
+}
+function syncHash() { var h = hashFor(MODE, SEL ? SEL.id : null); if (location.hash !== h) history.replaceState(null, '', h); }
+var lastRoute = '';
+function applyRoute() {
+  if (!D) return;
+  var r = parseHash();
+  if (r.mode === 'info') { if (!/\bm-\w/.test(body.className)) setMode('home', true); openInfo(); return; }
+  closeInfo();
+  if (touring) stopTour(true);
+  if (MAP.flying()) MAP.stopFly();
+  if ('k' in r.q) setCanton(r.q.k || null, { noRender: true, noFly: true, noHash: true });
+  if (r.mode === 'kantone' && r.id) setCanton(r.id, { noRender: true, noFly: true, noHash: true });
+  var changed = r.mode !== MODE;
+  setMode(r.mode, changed);
+  var it = r.id ? findItem(r.mode, r.id) : null;
+  SELREQ = r.id && !it ? { mode: r.mode, id: r.id } : null;
+  if (it) { if (!SEL || it.id !== SEL.id || it.kind !== SEL.kind) openItem(it); }
+  else if (SEL) { closeDetail(); flyContext(); }
+  else { renderHead(); renderList(); flyContext(); }
+  syncHash();
+  lastRoute = location.hash;
+}
+window.addEventListener('hashchange', applyRoute);
+function findItem(mode, id) {
+  if (mode === 'kantone') { var c = BYCODE[String(id).toUpperCase()]; return c ? { kind: 'kanton', id: c.code.toLowerCase(), c: c, code: c.code } : null; }
+  if (mode === 'wahrzeichen') return MARKBY[id] || null;
+  if (mode === 'familien') return POIS[+id] || null;
+  if (mode === 'wandern') return ROUTES.filter(function (r) { return r.id === id; })[0] || null;
+  return null;
+}
+function setMode(m, changed) {
+  MODE = m;
+  ['home', 'kantone', 'wahrzeichen', 'familien', 'wandern'].forEach(function (k) { body.classList.toggle('m-' + k, k === m); });
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs a'), function (a) { if (a.dataset.mode === m) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (changed) {
+    if (SEL) closeDetail(true);
+    pscroll.scrollTop = 0;
+    filt.familien.shown = 120;
+    if (m !== 'home') { showHint(); if (narrowMQ.matches && sheet === 'peek') setSheet('half'); }
+  }
+  setTitle();
+}
+function refreshMode(m) { if (MODE === m && !SEL) { renderHead(); renderList(); } else if (MODE === m && SEL && SEL.kind === 'kanton') { renderDetail(); } }
+function flyContext() {
+  if (MODE === 'home') { if (selected) MAP.flyCanton(selected, true); else MAP.flyHome(); return; }
+  if (selected) MAP.flyCanton(selected); else MAP.flyOverview();
+}
+
+/* ---------------- Panel: Kopf je Bereich ---------------- */
+function cantonSelect(id) {
+  return '<label class="sr" for="' + id + '">Kanton</label><select id="' + id + '"><option value="">Ganze Schweiz</option>' +
+    KT.ORDER.map(function (c) { return '<option value="' + c + '"' + (selected && selected.code === c ? ' selected' : '') + '>' + esc(KC[c].name) + '</option>'; }).join('') + '</select>';
+}
+function inSel(code) { return !selected || code === selected.code; }
+function renderHead() {
+  var h = '', K = selected ? KC[selected.code] : null;
+  if (MODE === 'kantone') {
+    h = '<span class="kicker">' + svgIcon('kanton') + 'Kantone</span><h2>26 Kantone, ' + swiss(D.ch.gem) + ' Gemeinden</h2>' +
+      '<p class="intro">Fläche, Einwohner und Wahrzeichen. Ein gewählter Kanton färbt die Seite in seinen Farben.</p>' +
+      '<div class="flt"><label class="sr" for="fReg">Region</label><select id="fReg"><option value="">Alle Regionen</option>' +
+      REGION_ORDER.map(function (r) { return '<option value="' + r + '"' + (filt.kantone.reg === r ? ' selected' : '') + '>' + REGION_NAME[r] + '</option>'; }).join('') + '</select>' +
+      (selected ? '<button type="button" class="chip" id="fAll">Ganze Schweiz</button>' : '') + '</div>';
+  } else if (MODE === 'wahrzeichen') {
+    var ms = MARKLIST.filter(function (m) { return inSel(m.code); });
+    h = '<span class="kicker">' + svgIcon('star') + 'Wahrzeichen' + (K ? ' · ' + esc(K.name) : '') + '</span><h2>' + (K ? ms.length + ' Wahrzeichen im Kanton ' + esc(K.name) : MARKLIST.length + ' Wahrzeichen in 3D') + '</h2>' +
+      '<p class="intro">Jedes Modell steht an seinem Ort und bewegt sich. Ein Klick fliegt hin, mit Luftbild.</p>' +
+      '<div class="flt" id="chipsM" role="group" aria-label="Arten">' + MGROUP.map(function (g, i) {
+        var n = ms.filter(function (m) { return m.grp === i; }).length;
+        return n ? '<button type="button" class="chip" data-g="' + i + '" aria-pressed="' + filt.wahrzeichen.groups[i] + '">' + svgIcon(g.ic) + esc(g.label) + ' <small>' + n + '</small></button>' : '';
+      }).join('') + '</div><div class="flt">' + cantonSelect('fK') + '</div>';
+  } else if (MODE === 'familien') {
+    var cnt = {}; POIS.forEach(function (p) { if (inSel(p.code)) cnt[p.c] = (cnt[p.c] || 0) + 1; });
+    h = '<span class="kicker">' + svgIcon('family') + 'Für Familien' + (K ? ' · ' + esc(K.name) : '') + '</span><h2>Spielplätze, Badis, Bahnhöfe und mehr</h2>' +
+      '<p class="intro">Wählen Sie, was die Karte zeigen soll. Die Liste zeigt ' + (K ? 'die Orte im Kanton.' : 'die Orte in der Nähe der Kartenmitte; mit einem Kanton alle Orte dort.') + '</p>' +
+      '<div class="flt" id="chipsF" role="group" aria-label="Kategorien">' + POICAT.map(function (c, i) {
+        return '<button type="button" class="chip" data-c="' + c.k + '" aria-pressed="' + !!LAYERS[c.k] + '"><img src="' + ICONS.url[c.k] + '" alt="">' + esc(c.label) + (POIS.length ? ' <small>' + swiss(cnt[i] || 0) + '</small>' : '') + '</button>';
+      }).join('') + '</div><div class="flt">' + cantonSelect('fK') + '</div>';
+  } else if (MODE === 'wandern') {
+    var rs = ROUTES.filter(function (r) { return !selected || r.cantons.indexOf(selected.code) >= 0; });
+    var nn = rs.filter(function (r) { return r.typ === 'national'; }).length;
+    h = '<span class="kicker">' + svgIcon('hike') + 'Wandern' + (K ? ' · ' + esc(K.name) : '') + '</span><h2>' + (ROUTES.length ? rs.length + ' Wanderrouten' + (K ? ' im Kanton ' + esc(K.name) : ' von SchweizMobil') : 'Wanderrouten') + '</h2>' +
+      '<p class="intro">Nationale und regionale Routen. Beim Heranzoomen zeigt die Karte das ganze Wanderwegnetz von swisstopo: gelb Wanderweg, rot Bergwanderweg, blau Alpinwanderweg.</p>' +
+      '<div class="flt" id="chipsW" role="group" aria-label="Routen"><button type="button" class="chip" data-w="nat" aria-pressed="' + filt.wandern.nat + '">National <small>' + nn + '</small></button>' +
+      '<button type="button" class="chip" data-w="reg" aria-pressed="' + filt.wandern.reg + '">Regional <small>' + (rs.length - nn) + '</small></button>' +
+      '<button type="button" class="chip" data-w="trails" aria-pressed="' + !!LAYERS.trails + '">Wanderwege auf der Karte</button></div><div class="flt">' + cantonSelect('fK') + '</div>';
+  }
+  phEl.innerHTML = h;
+  var fk = $('#fK'); if (fk) fk.addEventListener('change', function () { setCanton(fk.value || null); });
+  var fr = $('#fReg'); if (fr) fr.addEventListener('change', function () { filt.kantone.reg = fr.value; renderList(); });
+  var fa = $('#fAll'); if (fa) fa.addEventListener('click', function () { setCanton(null); });
+  var cm = $('#chipsM'); if (cm) cm.addEventListener('click', function (e) {
+    var b = e.target.closest('.chip'); if (!b) return; var i = +b.dataset.g, g = filt.wahrzeichen.groups;
+    var all = g.every(Boolean); if (all) g.forEach(function (_, k) { g[k] = k === i; }); else { g[i] = !g[i]; if (!g.some(Boolean)) g.forEach(function (_, k) { g[k] = true; }); }
+    Array.prototype.forEach.call(cm.querySelectorAll('.chip'), function (c) { c.setAttribute('aria-pressed', String(g[+c.dataset.g])); });
+    renderList();
+  });
+  var cf = $('#chipsF'); if (cf) cf.addEventListener('click', function (e) {
+    var b = e.target.closest('.chip'); if (!b) return; setLayer(b.dataset.c, !LAYERS[b.dataset.c]); b.setAttribute('aria-pressed', String(LAYERS[b.dataset.c])); renderList();
+  });
+  var cw = $('#chipsW'); if (cw) cw.addEventListener('click', function (e) {
+    var b = e.target.closest('.chip'); if (!b) return; var k = b.dataset.w;
+    if (k === 'trails') setLayer('trails', !LAYERS.trails); else filt.wandern[k] = !filt.wandern[k];
+    b.setAttribute('aria-pressed', String(k === 'trails' ? LAYERS.trails : filt.wandern[k])); renderList();
+  });
+}
+
+/* ---------------- Panel: Listen ---------------- */
+function itemBtn(id, pin, title, sub, side, cur) {
+  return '<button type="button" class="it" data-id="' + esc(id) + '"' + (cur ? ' aria-current="true"' : '') + '>' + pin + '<span class="tx"><b>' + title + '</b><span>' + sub + '</span></span>' + (side ? '<span class="sh">' + side + '</span>' : '<span></span>') + '</button>';
+}
+function wPin(code) { return '<span class="pin wp"><img src="' + wappen(code) + '" alt=""></span>'; }
+function catPin(c) { return '<span class="pin ic"><img src="' + ICONS.url[POICAT[c].k] + '" alt=""></span>'; }
+function grpPin(g) { return '<span class="pin">' + svgIcon(MGROUP[g].ic) + '</span>'; }
+function routePin(r) { return '<span class="pin nr' + (r.typ === 'national' ? ' nat' : '') + '">' + esc(r.nr) + '</span>'; }
+function poiTitle(p) { return p.name || POICAT[p.c].one; }
+function marksOf(code) { return MARKS[code] || []; }
+var listCenter = null, lastListT = 0;
+function renderList() {
+  if (!D || MODE === 'home') { listEl.innerHTML = ''; return; }
+  var h = '';
+  if (MODE === 'kantone') {
+    var regs = filt.kantone.reg ? [filt.kantone.reg] : REGION_ORDER;
+    regs.forEach(function (r) {
+      var cs = KT.REGIONS[r];
+      h += '<div class="grp"><span>' + REGION_NAME[r] + '</span><span>' + cs.length + '</span></div>';
+      cs.forEach(function (code) {
+        var c = BYCODE[code], K = KC[code];
+        h += itemBtn(code.toLowerCase(), wPin(code), esc(K.name), esc(K.capital.split(' (')[0]) + ' · ' + km2(c.ha) + ' km² · ' + swiss(c.pop) + ' Einw.', marksOf(code).length + ' ★', selected && selected.code === code);
+      });
+    });
+  } else if (MODE === 'wahrzeichen') {
+    var g = filt.wahrzeichen.groups, n = 0;
+    KT.ORDER.forEach(function (code) {
+      if (!inSel(code)) return;
+      var ms = marksOf(code).filter(function (m) { return g[m.grp]; });
+      if (!ms.length) return;
+      h += '<div class="grp"><span><img src="' + wappen(code) + '" alt="">' + esc(KC[code].name) + '</span><span>' + ms.length + '</span></div>';
+      ms.forEach(function (m) { n++; h += itemBtn(m.id, grpPin(m.grp), esc(m.name), esc(m.text), '', HOT && HOT.id === m.id); });
+    });
+    if (!n) h = '<p class="empty">Keine Wahrzeichen für diese Auswahl.</p>';
+  } else if (MODE === 'familien') {
+    if (!POIS.length) h = '<p class="empty">Die Orte werden geladen …</p>';
+    else {
+      var on = POICAT.map(function (c) { return !!LAYERS[c.k]; });
+      if (!on.some(Boolean)) h = '<p class="empty">Wählen Sie oben mindestens eine Kategorie.</p>';
+      else if (selected) {
+        if (!POIS.ready) h = '<p class="empty">Die Orte werden den Kantonen zugeordnet …</p>';
+        else {
+          var vs = POIS.filter(function (p) { return on[p.c] && p.code === selected.code; });
+          vs.sort(function (a, b) { return (b.name ? 1 : 0) - (a.name ? 1 : 0) || a.c - b.c || poiTitle(a).localeCompare(poiTitle(b), 'de'); });
+          h += '<p class="count"><span>' + swiss(vs.length) + ' Orte im Kanton ' + esc(KC[selected.code].name) + '</span><span>' + (vs.length > filt.familien.shown ? 'die ersten ' + filt.familien.shown : '') + '</span></p>';
+          vs.slice(0, filt.familien.shown).forEach(function (p) { h += itemBtn(p.id, catPin(p.c), esc(poiTitle(p)), esc(POICAT[p.c].one + ' · ' + swiss(p.h) + ' m ü. M.'), ''); });
+          if (vs.length > filt.familien.shown) h += '<button type="button" class="more" id="moreF">Weitere ' + Math.min(200, vs.length - filt.familien.shown) + ' zeigen</button>';
+          if (!vs.length) h += '<p class="empty">Keine Orte dieser Kategorien im Kanton.</p>';
+        }
+      } else {
+        var c0 = MAP.center();
+        if (!c0) h = '<p class="empty">Wählen Sie einen Kanton, um seine Orte zu sehen.</p>';
+        else {
+          listCenter = c0; lastListT = performance.now();
+          var R = clamp(c0.d * 0.5, 3000, 40000), near = [];
+          for (var i = 0; i < POIS.length; i++) {
+            var p = POIS[i]; if (!on[p.c]) continue;
+            var dd = Math.hypot(p.E - c0.E, p.N - c0.N); if (dd < R) near.push([dd, p]);
+          }
+          near.sort(function (a, b) { return a[0] - b[0]; });
+          h += '<p class="count"><span>' + (near.length ? swiss(near.length) + ' Orte im Umkreis von ' + swiss(R / 1000) + ' km' : 'Keine Orte in der Nähe') + '</span><span>' + (near.length > 80 ? 'die nächsten 80' : '') + '</span></p>';
+          near.slice(0, 80).forEach(function (q) { var p = q[1]; h += itemBtn(p.id, catPin(p.c), esc(poiTitle(p)), esc(POICAT[p.c].one + (p.code ? ' · ' + KC[p.code].name : '')), km(q[0]) + ' km'); });
+          if (!near.length) h += '<p class="empty">Zoomen Sie näher an einen Ort heran oder wählen Sie einen Kanton.</p>';
+        }
+      }
+    }
+  } else if (MODE === 'wandern') {
+    if (!ROUTES.length) h = '<p class="empty">Die Routen werden geladen …</p>';
+    else {
+      var cur = '';
+      ROUTES.forEach(function (r) {
+        if (selected && r.cantons.indexOf(selected.code) < 0) return;
+        if (r.typ === 'national' ? !filt.wandern.nat : !filt.wandern.reg) return;
+        var grp = r.typ === 'national' ? 'Nationale Routen' : 'Regionale Routen';
+        if (grp !== cur) { h += '<div class="grp"><span>' + grp + '</span></div>'; cur = grp; }
+        h += itemBtn(r.id, routePin(r), esc(r.name), esc(km(r.len) + ' km · ' + r.cantons.length + (r.cantons.length === 1 ? ' Kanton' : ' Kantone')), '');
+      });
+      if (!cur) h = '<p class="empty">Keine Routen für diese Auswahl.</p>';
+    }
+  }
+  listEl.innerHTML = h;
+  var mf = $('#moreF'); if (mf) mf.addEventListener('click', function () { filt.familien.shown += 200; renderList(); });
+}
+listEl.addEventListener('click', function (e) {
+  var b = e.target.closest('.it'); if (!b) return;
+  go(MODE, b.dataset.id);
+});
+
+/* ---------------- Panel: Detail ---------------- */
+function factsHTML(rows) { return '<dl class="facts">' + rows.map(function (f) { return '<div><dt>' + f[0] + '</dt><dd' + (f[2] ? ' class="t"' : '') + '>' + esc(f[1]) + '</dd></div>'; }).join('') + '</dl>'; }
+function linkHTML(items) { return '<ul class="links">' + items.map(function (l) { return '<li>' + (l.href ? '<a href="' + esc(l.href) + '"' + (/^https?:/.test(l.href) ? ' target="_blank" rel="noopener"' : '') + '>' + l.label + '</a>' : '<button type="button" data-act="' + l.act + '">' + l.label + '</button>') + '</li>'; }).join('') + '</ul>'; }
+var FLYLBL = svgIcon('fly') + 'Hier frei fliegen', MAPLBL = 'Auf der Landeskarte';
+function detailHTML(it) {
+  var h = '';
+  if (it.kind === 'kanton') {
+    var c = it.c, code = c.code, K = KC[code], ms = marksOf(code);
+    var nP = POIS.ready ? POIS.filter(function (p) { return p.code === code; }).length : null;
+    var nR = ROUTES.filter(function (r) { return r.cantons.indexOf(code) >= 0; }).length;
+    h += backBtn('Alle Kantone') +
+      '<div class="dhead"><img src="' + wappen(code) + '" alt="Wappen ' + esc(K.name) + '"><div><h3>' + esc(K.name) + '</h3><p class="sub">' + esc(K.local) + '</p></div></div>' +
+      '<div class="flagbar" aria-hidden="true"></div>' +
+      factsHTML([['Hauptort', K.capital, 1], [K.sinceNote ? 'Kanton seit' : 'Im Bund seit', K.since], ['Amtssprache' + (K.lang.indexOf(',') > 0 ? 'n' : ''), K.lang, 1],
+        ['Fläche', km2(c.ha) + ' km²'], ['Einwohner', swiss(c.pop)], ['Gemeinden', String(c.gem)], ['Höhenlage', c.hmin + '–' + swiss(c.hmax) + ' m']]) +
+      '<div class="btns"><a href="' + esc(hashFor('wahrzeichen')) + '">' + svgIcon('star') + 'Wahrzeichen <small>' + ms.length + '</small></a>' +
+      '<a href="' + esc(hashFor('familien')) + '">' + svgIcon('family') + 'Für Familien' + (nP != null ? ' <small>' + swiss(nP) + '</small>' : '') + '</a>' +
+      '<a href="' + esc(hashFor('wandern')) + '">' + svgIcon('hike') + 'Wanderrouten' + (ROUTES.length ? ' <small>' + nR + '</small>' : '') + '</a></div>' +
+      linkHTML([{ act: 'fly', label: FLYLBL }]) +
+      '<p class="sec"><span>Wahrzeichen</span><span>' + ms.length + '</span></p><div class="list">' +
+      ms.map(function (m) { return '<a class="it" href="#/wahrzeichen/' + m.id + '?k=' + code.toLowerCase() + '">' + grpPin(m.grp) + '<span class="tx"><b>' + esc(m.name) + '</b><span>' + esc(m.text) + '</span></span><span></span></a>'; }).join('') + '</div>';
+  } else if (it.kind === 'mark') {
+    var K2 = KC[it.code], g = MGROUP[it.grp];
+    h += backBtn('Alle Wahrzeichen') +
+      '<div class="dhead"><img src="' + wappen(it.code) + '" alt="Wappen ' + esc(K2.name) + '"><div><h3>' + esc(it.name) + '</h3><p class="sub">' + esc(g.label.split(' & ')[0].replace(/n$/, '')) + ' · Kanton ' + esc(K2.name) + '</p></div></div>' +
+      '<p class="txt">' + esc(it.text) + '</p>' +
+      factsHTML([['Kanton', K2.name, 1], ['Art', g.label, 1], ['Höhe', '<span data-h></span>', 1], ['Koordinaten LV95', swiss(it.E) + ' / ' + swiss(it.N)]]).replace('&lt;span data-h&gt;&lt;/span&gt;', '<span data-h>…</span>') +
+      linkHTML([{ act: 'close', label: svgIcon('zoom') + 'Näher heran' }, { act: 'fly', label: FLYLBL }, { href: geoAdminURL(it.E, it.N), label: MAPLBL }]) +
+      '<p class="note">Das Modell ist vereinfacht und nicht massstäblich; beim Heranzoomen zeigt das Luftbild den Ort.</p>';
+  } else if (it.kind === 'poi') {
+    var c3 = POICAT[it.c], K3 = it.code ? KC[it.code] : null;
+    var L = [{ act: 'close', label: svgIcon('zoom') + 'Näher heran' }, { href: geoAdminURL(it.E, it.N), label: MAPLBL }];
+    if (c3.k !== 'bahn' && c3.k !== 'seilbahn') L.push({ href: osmURL(it.E, it.N), label: 'In OpenStreetMap' });
+    h += backBtn('Alle Orte') +
+      '<div class="dhead"><img class="ico" src="' + ICONS.url[c3.k] + '" alt=""><div><h3>' + esc(poiTitle(it)) + '</h3><p class="sub">' + esc(c3.one + (K3 ? ' · Kanton ' + K3.name : '')) + '</p></div></div>' +
+      factsHTML([['Kategorie', c3.one, 1], ['Kanton', K3 ? K3.name : '–', 1], ['Höhe', swiss(it.h) + ' m ü. M.'], ['Koordinaten LV95', swiss(it.E) + ' / ' + swiss(it.N)]]) +
+      linkHTML(L) +
+      '<p class="note">' + (c3.k === 'bahn' || c3.k === 'seilbahn' ? 'Quelle: Bundesamt für Verkehr BAV.' : 'Quelle: © OpenStreetMap-Mitwirkende' + (POIDATE ? ', Stand ' + POIDATE.split('-').reverse().join('.') : '') + '.' + (it.name ? '' : ' In den Daten ist kein Name eingetragen.')) + '</p>';
+  } else if (it.kind === 'route') {
+    h += backBtn('Alle Routen') +
+      '<div class="dhead"><span class="it" style="padding:0;width:auto;grid-template-columns:36px">' + routePin(it) + '</span><div><h3>' + esc(it.name) + '</h3><p class="sub">' + (it.typ === 'national' ? 'Nationale Route ' : 'Regionale Route ') + esc(it.nr) + ' · SchweizMobil</p></div></div>' +
+      factsHTML([['Länge auf der Karte', km(it.len) + ' km'], ['Kantone', String(it.cantons.length)], ['Art', it.typ === 'national' ? 'National' : 'Regional', 1]]) +
+      '<p class="sec"><span>Durch die Kantone</span></p><div class="flt" style="margin-top:6px">' + it.cantons.map(function (code) { return '<a class="chip" href="#/kantone/' + code.toLowerCase() + '"><img src="' + wappen(code) + '" alt="" style="width:16px;height:19px;margin:0">' + esc(KC[code].name) + '</a>'; }).join('') + '</div>' +
+      linkHTML([{ act: 'fly', label: FLYLBL }, { act: 'trails', label: LAYERS.trails ? 'Wanderwege ausblenden' : 'Wanderwege einblenden' }, { href: 'https://schweizmobil.ch/de/wanderland', label: 'Wanderland bei SchweizMobil' }]) +
+      '<p class="note">Länge aus der vereinfachten Linie berechnet; Etappen, Höhenmeter und Varianten finden Sie bei SchweizMobil.</p>';
+  }
+  return h;
+}
+function renderDetail() { if (SEL) { detailEl.innerHTML = detailHTML(SEL); wireDetail(); } }
+function wireDetail() {
+  var b = $('#back'); if (b) b.addEventListener('click', backFromDetail);
+  var hEl = detailEl.querySelector('[data-h]'); if (hEl && SEL && SEL.kind === 'mark') { var hh = MAP.heightAt ? MAP.heightAt(SEL.E, SEL.N) : null; hEl.textContent = hh != null ? swiss(hh) + ' m ü. M.' : '–'; }
+}
+detailEl.addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-act]'); if (!b || !SEL) return;
+  var a = b.dataset.act;
+  if (a === 'fly') MAP.startFly(SEL);
+  else if (a === 'close') { if (SEL.kind === 'mark') MAP.flyMark(SEL, true); else MAP.flyPOI(SEL, true); }
+  else if (a === 'trails') { setLayer('trails', !LAYERS.trails); renderDetail(); }
+});
+function openItem(it) {
+  if (SEL) closeDetail(true);
+  SEL = it; SELREQ = null;
+  panel.classList.add('has-detail'); listEl.hidden = true; detailEl.hidden = false;
+  if (it.kind === 'kanton') setCanton(it.code, { noRender: true, noFly: true, noHash: true });
+  else if ((it.kind === 'mark' || it.kind === 'poi') && it.code && selected && selected.code !== it.code) setCanton(it.code, { noRender: true, noFly: true, noHash: true });
+  renderHead();
+  detailEl.innerHTML = detailHTML(it); wireDetail();
+  pscroll.scrollTop = 0;
+  if (it.kind === 'kanton') MAP.flyCanton(it.c);
+  else if (it.kind === 'mark') { HOT = it; MAP.flyMark(it); }
+  else if (it.kind === 'poi') { MAP.setHotPOI(+it.id); MAP.flyPOI(it); }
+  else if (it.kind === 'route') { MAP.setRoute(it); MAP.flyRoute(it); }
+  if (narrowMQ.matches && sheet === 'peek') setSheet('half');
+  setTitle();
+}
+function closeDetail(silent) {
+  if (!SEL) return;
+  var was = SEL; SEL = null; HOT = null;
+  MAP.setHotPOI(-1);
+  if (was.kind === 'route') MAP.setRoute(null);
+  panel.classList.remove('has-detail'); detailEl.hidden = true; detailEl.innerHTML = ''; listEl.hidden = false;
+  if (!silent) { renderHead(); renderList(); }
+}
+function backFromDetail() { go(MODE, null); }
+
+/* ---------------- Blatt auf dem Handy ---------------- */
+var sheet = 'half';
+function sheetPx(s) {
+  var top = parseFloat(getComputedStyle(root).getPropertyValue('--top')) || 54, vh = window.innerHeight;
+  return s === 'peek' ? vh * 0.24 : s === 'full' ? vh - top - 14 - (parseFloat(getComputedStyle(root).getPropertyValue('--tabbar')) || 64) : vh * 0.46;
+}
+function setSheet(s) {
+  sheet = s;
+  panel.style.setProperty('--sheet', s === 'peek' ? '24svh' : s === 'full' ? 'calc(100svh - var(--top) - var(--tabbar) - 14px)' : '46svh');
+}
+(function sheetDrag() {
+  var hd = $('#handle'), y0 = 0, h0 = 0, moved = 0, id = null;
+  hd.addEventListener('pointerdown', function (e) { id = e.pointerId; y0 = e.clientY; h0 = panel.getBoundingClientRect().height; moved = 0; try { hd.setPointerCapture(id); } catch (er) {} panel.classList.add('dragging'); });
+  hd.addEventListener('pointermove', function (e) {
+    if (e.pointerId !== id) return; var dy = e.clientY - y0; moved = Math.max(moved, Math.abs(dy));
+    panel.style.setProperty('--sheet', clamp(h0 - dy, sheetPx('peek') * 0.8, sheetPx('full')) + 'px');
+  });
+  function end(e) {
+    if (e.pointerId !== id) return; id = null; panel.classList.remove('dragging');
+    if (moved < 6) { setSheet(sheet === 'half' ? 'full' : sheet === 'full' ? 'peek' : 'half'); return; }
+    var hNow = panel.getBoundingClientRect().height, best = 'half', bd = 1e9;
+    ['peek', 'half', 'full'].forEach(function (s) { var d = Math.abs(sheetPx(s) - hNow); if (d < bd) { bd = d; best = s; } });
+    setSheet(best);
+  }
+  hd.addEventListener('pointerup', end); hd.addEventListener('pointercancel', end);
+  hd.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSheet(sheet === 'half' ? 'full' : sheet === 'full' ? 'peek' : 'half'); } });
+})();
+
+/* ---------------- Info ---------------- */
+var infoDlg = $('#infoDlg'), infoFrom = null;
+function openInfo() { if (!infoDlg.hidden) return; infoFrom = document.activeElement; infoDlg.hidden = false; $('#infoClose').focus(); }
+function closeInfo() { if (infoDlg.hidden) return; infoDlg.hidden = true; if (infoFrom && infoFrom.focus) infoFrom.focus(); }
+$('#infoClose').addEventListener('click', function () { if (lastRoute && lastRoute !== location.hash) history.back(); else go(MODE, SEL ? SEL.id : null, true); });
+infoDlg.addEventListener('click', function (e) { if (e.target === infoDlg) $('#infoClose').click(); });
+var hintEl = $('#hint'), hintShown = false;
+function showHint() { if (hintShown || !fine || TEST) return; hintShown = true; hintEl.classList.add('on'); setTimeout(function () { hintEl.classList.remove('on'); }, 6000); }
+
+/* ---------------- Ebenen-Fenster ---------------- */
+var legend = $('#legend'), tLayers = $('#tLayers');
+(function buildLegend() {
+  function row(k, label, sw, sub) {
+    return '<label class="lg-row"><span class="sw">' + sw + '</span><span>' + label + (sub ? '<small>' + sub + '</small>' : '') + '</span><input type="checkbox" data-l="' + k + '"' + (LAYERS[k] ? ' checked' : '') + '><span class="tg" aria-hidden="true"></span></label>';
+  }
+  $('#legendBody').innerHTML =
     '<p class="lg-h">Karte</p>' +
-    row('sat', 'Luftbild (Nahansicht)', '<i class="sw-sat"></i>') +
-    row('trails', 'Wanderwege', '<i class="sw-trail"></i>') +
+    row('sat', 'Luftbild', '<i class="sw-sat"></i>', 'beim Heranzoomen') +
+    row('trails', 'Wanderwege und Routen', '<i class="sw-trail"></i>') +
     row('marks', 'Wahrzeichen in 3D', '<i class="sw-mark"></i>') +
     row('borders', 'Grenzen', '<i class="sw-border"></i>') +
     row('water', 'Flüsse und Seeufer', '<i class="sw-water"></i>') +
     row('labels', 'Namen', '<i class="sw-label">Aa</i>') +
-    '<p class="lg-h">Für Familien unterwegs</p>' +
+    '<p class="lg-h">Für Familien</p>' +
     POICAT.map(function (c) { return row(c.k, c.label, '<img src="' + ICONS.url[c.k] + '" alt="">'); }).join('');
-  el.addEventListener('change', function (e) { var t = e.target; if (t.dataset && t.dataset.l) setLayer(t.dataset.l, t.checked); });
-  var btn = $('#layersBtn'), panel = $('#legend');
-  function show(v) { panel.hidden = !v; btn.setAttribute('aria-expanded', v ? 'true' : 'false'); }
-  btn.addEventListener('click', function () { show(panel.hidden); });
-  $('#legendClose').addEventListener('click', function () { show(false); btn.focus(); });
+  $('#legendBody').addEventListener('change', function (e) {
+    var t = e.target; if (!t.dataset || !t.dataset.l) return;
+    setLayer(t.dataset.l, t.checked);
+    if (MODE === 'familien' || MODE === 'wandern') { renderHead(); if (!SEL) renderList(); }
+  });
 })();
+function showLegend(v) { legend.classList.toggle('on', v); tLayers.setAttribute('aria-expanded', String(v)); if (v) $('#legendClose').focus(); }
+tLayers.addEventListener('click', function () { showLegend(!legend.classList.contains('on')); });
+$('#legendClose').addEventListener('click', function () { showLegend(false); tLayers.focus(); });
+document.addEventListener('pointerdown', function (e) { if (legend.classList.contains('on') && !legend.contains(e.target) && !tLayers.contains(e.target)) showLegend(false); });
+$('#tSat').addEventListener('click', function () { setLayer('sat', !LAYERS.sat); });
+$('#tSat').setAttribute('aria-pressed', String(LAYERS.sat));
 
-/* Erkunden: freie Kamera statt Scroll-Erzählung */
-var EXP = { on: false, mode: 'orbit' };
-var onExplore = function () {};
-function setExplore(on, mode) {
-  if (mode) EXP.mode = mode;
-  if (on !== EXP.on) {
-    EXP.on = on;
-    root.classList.toggle('exploring', on);
-    $('#exploreBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
-    $('#exploreBtn').querySelector('span').textContent = on ? 'Zurück zur Geschichte' : 'Karte erkunden';
-    if (!on && document.pointerLockElement) document.exitPointerLock();
-  }
-  Array.prototype.forEach.call(document.querySelectorAll('#modeSeg button'), function (b) { b.setAttribute('aria-pressed', b.dataset.mode === EXP.mode ? 'true' : 'false'); });
-  root.classList.toggle('fly-touch', EXP.on && EXP.mode === 'fly' && !fine);
-  var help = $('#explHelp'); clearTimeout(setExplore.t);
-  if (EXP.on) { help.hidden = false; setExplore.t = setTimeout(function () { help.hidden = true; }, 7000); } else help.hidden = true;
-  $('#keysOrbit').hidden = EXP.mode !== 'orbit'; $('#keysFly').hidden = EXP.mode !== 'fly';
-  onExplore();
+/* ---------------- Rundflug ---------------- */
+var TOUR = [
+  { key: 'schweiz', kick: 'Die Schweiz', title: '', text: '', hi: [] },
+  { key: 'lemanique', kick: 'Genferseeregion', title: 'Vom Genfersee ins Rhonetal', text: 'Die Rhone entspringt am Rhonegletscher, durchfliesst das Wallis und mündet zwischen Le Bouveret und Villeneuve in den Genfersee. Im Kanton Genf verlässt sie die Schweiz. Im Wallis steht mit der Dufourspitze der höchste Gipfel des Landes, am Nordufer des Sees liegen zwischen Lausanne und Vevey die Rebterrassen des Lavaux.' },
+  { key: 'mittelland', kick: 'Espace Mittelland', title: 'Vom Oberland bis an den Doubs', text: 'Die Region reicht von den Gletschern des Berner Oberlands über das Mittelland bis in die Ketten des Juras. Durch sie verläuft die Sprachgrenze: Bern und Freiburg sind zweisprachig, Neuenburg und Jura französischsprachig. In Bern tagen Bundesrat und Parlament.' },
+  { key: 'nordwest', kick: 'Nordwestschweiz', title: 'Am Rheinknie', text: 'Bei Basel wendet sich der Rhein nach Norden. Am Dreiländereck treffen die Schweiz, Deutschland und Frankreich aufeinander. Im Aargau vereinigen sich Aare, Reuss und Limmat; die Gegend um Brugg heisst deshalb Wasserschloss der Schweiz.' },
+  { key: 'zuerich', kick: 'Zürich', title: 'Ein Kanton als eigene Grossregion', text: 'Kein Kanton zählt mehr Einwohner. Er reicht vom Rhein im Norden über das Weinland bis ins Zürcher Oberland. Die Stadt Zürich liegt am Ausfluss der Limmat aus dem See.' },
+  { key: 'zentral', kick: 'Zentralschweiz', title: 'Rund um den Vierwaldstättersee', text: 'Uri, Schwyz und Unterwalden schlossen sich zum ersten Bund der Eidgenossenschaft zusammen. Der Bundesbrief ist auf Anfang August 1291 datiert; die Überlieferung verlegt den Schwur auf das Rütli am Urnersee.' },
+  { key: 'ost', kick: 'Ostschweiz', title: 'Vom Bodensee bis ins Engadin', text: 'Sieben Kantone, darunter Graubünden, der flächengrösste der Schweiz und der einzige mit drei Amtssprachen. Der Säntis überragt das Appenzellerland; im Süden erreicht die Region am Piz Bernina über 4000 m.' },
+  { key: 'tessin', kick: 'Tessin', title: 'Südlich des Gotthards', text: 'Das Tessin ist der einzige Kanton mit Italienisch als alleiniger Amtssprache. Am Lago Maggiore liegt auf 193 m ü. M. der tiefste Punkt der Schweiz, keine 50 km Luftlinie vom Rheinwaldhorn auf 3402 m entfernt.' }
+];
+TOUR.forEach(function (s) { if (!s.hi) s.hi = KT.REGIONS[s.key] || []; });
+var tourI = 0, tourT0 = 0, TOUR_DUR = 11000, tourPaused = false, capEl = $('#caption');
+function startTour() {
+  if (MAP.flying()) MAP.stopFly();
+  TOUR[0].title = '26 Kantone auf ' + swiss(D.ch.ha / 100) + ' km²';
+  TOUR[0].text = 'Vom Lago Maggiore auf ' + D.ch.hmin + ' m ü. M. bis zur Dufourspitze auf ' + D.ch.hmax + ' m. Die rote Linie ist die Landesgrenze, die gestrichelten Linien sind die Grenzen der Kantone nach swissBOUNDARIES3D, Stand 2026.';
+  touring = true; body.classList.add('touring'); capEl.hidden = false;
+  tourGo(0);
 }
-$('#exploreBtn').addEventListener('click', function () { setExplore(!EXP.on); });
-$('#modeSeg').addEventListener('click', function (e) { var b = e.target.closest('button[data-mode]'); if (b) setExplore(true, b.dataset.mode); });
-window.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && EXP.on && !document.pointerLockElement) setExplore(false);
+function tourGo(i) {
+  tourI = clamp(i, 0, TOUR.length - 1); var s = TOUR[tourI];
+  MAP.flyKey(s.key);
+  $('#capKick').textContent = s.kick; $('#capTitle').textContent = s.title; $('#capText').textContent = s.text;
+  $('#capW').innerHTML = s.hi.map(function (c) { return '<img src="' + wappen(c) + '" alt="" title="' + esc(KC[c].name) + '">'; }).join('');
+  $('#capStep').textContent = (tourI + 1) + ' / ' + TOUR.length;
+  $('#capPrev').disabled = tourI === 0; $('#capNext').textContent = tourI === TOUR.length - 1 ? 'Ende' : 'Weiter';
+  tourT0 = performance.now();
+}
+function stepTour(now) {
+  if (!touring) return;
+  var u = clamp((now - tourT0) / TOUR_DUR, 0, 1);
+  $('#capBar').style.width = (u * 100).toFixed(1) + '%';
+  if (u >= 1 && !tourPaused) { if (tourI < TOUR.length - 1) tourGo(tourI + 1); else stopTour(); }
+}
+function stopTour(silent) {
+  if (!touring) return;
+  touring = false; body.classList.remove('touring'); capEl.hidden = true;
+  if (!silent) flyContext();
+}
+$('#tourBtn').addEventListener('click', startTour);
+$('#capPrev').addEventListener('click', function () { tourGo(tourI - 1); });
+$('#capNext').addEventListener('click', function () { if (tourI < TOUR.length - 1) tourGo(tourI + 1); else stopTour(); });
+$('#capStop').addEventListener('click', function () { stopTour(); });
+capEl.addEventListener('pointerenter', function () { tourPaused = true; });
+capEl.addEventListener('pointerleave', function () { tourPaused = false; tourT0 = Math.max(tourT0, performance.now() - TOUR_DUR * 0.6); });
+$('#flyBtnHome').addEventListener('click', function () { MAP.startFly(null); });
+$('#tFly').addEventListener('click', function () { if (MAP.flying()) MAP.stopFly(); else MAP.startFly(null); });
+$('#flyExit').addEventListener('click', function () { MAP.stopFly(); });
+$('#zoomIn').addEventListener('click', function () { MAP.zoom(0.5); });
+$('#zoomOut').addEventListener('click', function () { MAP.zoom(2); });
+$('#homeBtn').addEventListener('click', function () { if (touring) stopTour(true); if (selected && MODE !== 'home') MAP.flyCanton(selected); else MAP.flyOverview(); });
+$('#northBtn').addEventListener('click', function () { MAP.north(); });
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  if (!infoDlg.hidden) { $('#infoClose').click(); return; }
+  if (legend.classList.contains('on')) { showLegend(false); tLayers.focus(); return; }
+  if (MAP.flying()) { if (!document.pointerLockElement) MAP.stopFly(); return; }
+  if (touring) { stopTour(); return; }
+  if (SEL) backFromDetail();
 });
 
-/* ---------------- Szene ---------------- */
-var anchors = [];
-function measure() {
-  anchors = Array.prototype.map.call(document.querySelectorAll('[data-cam]'), function (s) {
-    var r = s.getBoundingClientRect();
-    return { key: s.dataset.cam, y: r.top + window.scrollY + r.height * 0.5, el: s };
-  });
-}
-function anchorY(key) { for (var i = 0; i < anchors.length; i++) if (anchors[i].key === key) return anchors[i].y; return 0; }
-
+/* ---------------- Karte ---------------- */
 function start() {
-  var h0 = hashCanton(); if (h0) selectCanton(h0, { noHash: true });
-  if (!window.THREE) { fail('Die 3D-Bibliothek konnte nicht geladen werden. Die Texte bleiben lesbar.'); return; }
-  if (typeof DecompressionStream === 'undefined') { fail('Dieser Browser kann die Geodaten nicht entpacken. Die Texte bleiben lesbar.'); return; }
+  if (!window.THREE) { fail('Die 3D-Bibliothek konnte nicht geladen werden.'); return; }
+  if (typeof DecompressionStream === 'undefined') { fail('Dieser Browser kann die Geodaten nicht entpacken.'); return; }
   THREE.ColorManagement.enabled = false;
 
   var canvas = $('#scene');
@@ -293,8 +750,8 @@ function start() {
   var renderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  } catch (e) { fail('WebGL ist in diesem Browser nicht verfügbar. Die Texte bleiben lesbar.'); return; }
-  if (!renderer.capabilities.isWebGL2) { fail('Für das Relief braucht es WebGL 2. Die Texte bleiben lesbar.'); return; }
+  } catch (e) { fail('WebGL ist in diesem Browser nicht verfügbar.'); return; }
+  if (!renderer.capabilities.isWebGL2) { fail('Für das Relief braucht es WebGL 2.'); return; }
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
   var small = Math.min(screen.width, screen.height) < 700;
@@ -337,7 +794,7 @@ function start() {
   skyMat.uniforms.uFog = U.uFog; skyMat.uniforms.uDark = U.uDark;
   var C = {}, CT = {};
   ['--paper', '--m-land', '--m-lit', '--m-shade', '--m-forest', '--m-out', '--m-water', '--m-water-deep', '--m-contour', '--m-hi',
-   '--m-side', '--m-side-2', '--m-line', '--m-nation', '--m-cant', '--m-river', '--m-shore', '--m-route', '--ink'
+   '--m-side', '--m-side-2', '--m-line', '--m-nation', '--m-cant', '--m-river', '--m-shore', '--m-route', '--m-route-sel', '--ink'
   ].forEach(function (k) { C[k] = new THREE.Color(); CT[k] = new THREE.Color(); });
 
   var COMMON_FRAG = [
@@ -618,25 +1075,30 @@ function start() {
       '}'
     ].join('\n')
   });
-  function buildPOI(P) {
-    var pos = [], cat = [], ids = [], list = [];
-    POICAT.forEach(function (c, ci) {
-      var d = P.cats && P.cats[c.k]; if (!d) return;
-      for (var i = 0, n = d.xyz.length / 3; i < n; i++) {
-        var E = P.E0 + d.xyz[i * 3], N = P.N0 + d.xyz[i * 3 + 1], h = d.xyz[i * 3 + 2];
-        pos.push(X(E), Y(h) + 6, Z(N)); cat.push(ci); ids.push(list.length);
-        list.push({ c: ci, E: E, N: N, h: h, name: (d.names && d.names[i]) || '' });
-      }
-    });
+  function buildPOI() {
+    if (POI || !POIS.length) return;
+    var pos = new Float32Array(POIS.length * 3), cat = new Float32Array(POIS.length), ids = new Float32Array(POIS.length);
+    for (var i = 0; i < POIS.length; i++) {
+      var p = POIS[i]; pos[i * 3] = X(p.E); pos[i * 3 + 1] = Y(p.h) + 6; pos[i * 3 + 2] = Z(p.N); cat[i] = p.c; ids[i] = i;
+    }
     var g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('aCat', new THREE.Float32BufferAttribute(cat, 1));
-    g.setAttribute('aId', new THREE.Float32BufferAttribute(ids, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aCat', new THREE.BufferAttribute(cat, 1));
+    g.setAttribute('aId', new THREE.BufferAttribute(ids, 1));
     var pts = new THREE.Points(g, poiMat); pts.frustumCulled = false; pts.renderOrder = 9;
     scene.add(pts);
-    POI = { pts: pts, list: list, pos: new Float32Array(pos), date: P.date };
+    POI = { pts: pts, list: POIS, pos: pos };
   }
   var pv = new THREE.Vector3();
+  /* liegt zwischen Punkt und Kamera Gelände? */
+  function hidden(x, y, z) {
+    var cp = camera.position;
+    for (var s = 1; s <= 10; s++) {
+      var f = s / 11, px = x + (cp.x - x) * f, py = y + (cp.y - y) * f, pz = z + (cp.z - z) * f, E = px + EC, N = NC - pz;
+      if (inGrid(E, N) && Y(groundAt(E, N)) > py + 12) return true;
+    }
+    return false;
+  }
   function poiAt(cx, cy, W, H) {
     if (!POI) return null;
     var best = null, bd = 15 * 15, cp = camera.position;
@@ -645,24 +1107,31 @@ function start() {
       var x = POI.pos[i * 3], y = POI.pos[i * 3 + 1], z = POI.pos[i * 3 + 2];
       var dx = x - cp.x, dy = y - cp.y, dz = z - cp.z, d2 = dx * dx + dy * dy + dz * dz, fc = poiFar[it.c] * 0.8;
       if (d2 > fc * fc) continue;
-      pv.set(x, y, z).project(camera);
+      var dist = Math.sqrt(d2), lift = Math.min(dist * 0.02, 400) / (dist || 1);
+      pv.set(x - dx * lift, y - dy * lift + Math.min(dist * 0.006, 120), z - dz * lift).project(camera);
       if (pv.z > 1) continue;
-      var sx = (pv.x + 1) / 2 * W, sy = (1 - pv.y) / 2 * H - Math.min(Math.sqrt(d2) * 0.006, 120) / (U.uPx.value * Math.sqrt(d2) || 1);
+      var sx = (pv.x + 1) / 2 * W, sy = (1 - pv.y) / 2 * H;
       var e = (sx - cx) * (sx - cx) + (sy - cy) * (sy - cy);
-      if (e < bd) { bd = e; best = { it: it, i: i, sx: sx, sy: sy }; }
+      if (e < bd && !hidden(x, y, z)) { bd = e; best = { it: it, i: i, sx: sx, sy: sy }; }
     }
     return best;
   }
 
   /* ---------------- Wanderrouten SchweizMobil ---------------- */
-  function buildRoutes(Rt) {
+  function routeLines(r) { return r.lines.map(function (a) { var o = []; for (var i = 0; i < a.length; i += 2) o.push([a[i], a[i + 1]]); return o; }); }
+  function buildRoutes() {
+    if (R.routesNat || R.routesReg || !ROUTES.length) return;
     var nat = [], reg = [];
-    (Rt.routes || []).forEach(function (r) {
-      var L = r.lines.map(function (a) { var o = []; for (var i = 0; i < a.length; i += 2) o.push([a[i] + Rt.E0, a[i + 1] + Rt.N0]); return o; });
-      (r.typ === 'national' ? nat : reg).push.apply(r.typ === 'national' ? nat : reg, L);
-    });
+    ROUTES.forEach(function (r) { var L = routeLines(r); (r.typ === 'national' ? nat : reg).push.apply(r.typ === 'national' ? nat : reg, L); });
     if (reg.length) { R.routesReg = buildRibbon(reg, ribbonMat('--m-route', 1.4, 0)); R.routesReg.renderOrder = 5; }
-    if (nat.length) { R.routesNat = buildRibbon(nat, ribbonMat('--m-route', small ? 2.2 : 2.6, 0, { dash: false })); R.routesNat.renderOrder = 5; }
+    if (nat.length) { R.routesNat = buildRibbon(nat, ribbonMat('--m-route', small ? 2.2 : 2.6, 0)); R.routesNat.renderOrder = 5; }
+  }
+  var ROUTESEL = {}, routeSel = null;
+  function routeRibbon(r) {
+    if (ROUTESEL[r.id]) return ROUTESEL[r.id];
+    var m = buildRibbon(routeLines(r), ribbonMat('--m-route-sel', small ? 4 : 4.6, 0, { flow: true }), true);
+    m.renderOrder = 8; m.userData.o = 0; m.userData.draw = 0; m.visible = false;
+    return (ROUTESEL[r.id] = m);
   }
 
   /* ---------------- 3D-Wahrzeichen ---------------- */
@@ -688,128 +1157,148 @@ function start() {
   }
   function updateModels(t, dt, H) {
     if (!MODELS.length) return;
-    var kpx = 2 * Math.tan(camera.fov * Math.PI / 360) / H, selCode = selected ? selected.code : null;
+    var kpx = 2 * Math.tan(camera.fov * Math.PI / 360) / H, selCode = selected ? selected.code : null, far = MODE === 'wahrzeichen' || MODE === 'kantone' ? 400000 : 85000, kS = small ? 0.8 : 1;
     for (var i = 0; i < MODELS.length; i++) {
       var o = MODELS[i], m = o.m;
       var gx = X(m.E), gz = Z(m.N), dx = gx - camera.position.x, dz = gz - camera.position.z;
       var hd = Math.sqrt(dx * dx + dz * dz);
-      var want = LAYERS.marks && ready && hd < 85000 ? 1 : 0;
+      var hot = !!(HOT && HOT.id === m.id);
+      var mine = selCode === o.code, want = LAYERS.marks && ready && !touring && (hot || (mine ? hd < far : hd < (selCode ? 30000 : 85000))) ? 1 : 0;
       o.vis = lerp(o.vis, want, TEST ? 1 : 1 - Math.exp(-dt * 4));
       if (o.vis < 0.01) { if (o.holder.visible) o.holder.visible = false; continue; }
       var gy = Y(groundAt(m.E, m.N));
       o.holder.position.set(gx, gy, gz);
       var dist = camera.position.distanceTo(o.holder.position);
-      var hot = selCode === o.code && selMark === m.idx;
-      var px = hot ? 130 : selCode === o.code ? 104 : 92;
+      var px = (hot ? 130 : mine ? 100 : selCode ? 70 : 88) * kS;
       var sc = Math.max(1.6, px * kpx * dist / o.h) * (0.3 + 0.7 * o.vis);
       o.holder.scale.set(sc, sc, sc);
       o.holder.visible = true;
-      var pulse = (t * 0.45 + o.ph / 6.28) % 1;
+      var pulse = reduce ? 0.35 : (t * 0.45 + o.ph / 6.28) % 1;
       o.ring.scale.setScalar(o.foot * (0.85 + pulse * 0.6));
       o.ring.material.opacity = (1 - pulse) * 0.55 * o.vis;
-      try { o.inst.update(t, dt); } catch (e) {}
+      try { if (!reduce || !o.posed) { o.inst.update(reduce ? 0 : t, reduce ? 0 : dt); o.posed = true; } } catch (e) {}
     }
   }
 
   /* ---------------- Beschriftungen ---------------- */
   var labelsEl = $('#labels'), LBL = [], LBL_ORDER = [], PRIO = { canton: 0, poi: 1, lake: 2, peak: 3 };
-  function addLabel(text, kind, E, N, sections, sub, elev, extra) {
+  function addLabel(text, kind, E, N, extra) {
     var el = document.createElement('div');
     el.className = 'lbl ' + kind;
-    if (kind === 'canton') el.innerHTML = esc(text) + (sub ? '<small>' + esc(sub) + '</small>' : '');
-    else if (kind === 'peak') el.innerHTML = '<span>' + esc(text) + '</span><em>' + elev + '</em>';
+    if (kind === 'peak') el.innerHTML = '<span>' + esc(text) + '</span><em>' + esc(extra.elev) + '</em>';
     else el.textContent = text;
     labelsEl.appendChild(el);
     var lift = kind === 'peak' ? 60 : kind === 'poi' ? 50 : 80;
-    var L = { el: el, kind: kind, name: text, p: new THREE.Vector3(X(E), Y(hAt(E, N)) + lift, Z(N)), s: sections, o: 0, occ: false, n: LBL.length, w: 0 };
+    var L = { el: el, kind: kind, name: text, E: E, N: N, p: new THREE.Vector3(X(E), Y(hAt(E, N)) + lift, Z(N)), o: 0, occ: false, n: LBL.length, w: 0, hit: false };
     if (extra) Object.keys(extra).forEach(function (k) { L[k] = extra[k]; });
+    el.__L = L;
     LBL.push(L); return L;
   }
-  function regionOf(code) { return KC[code] && KC[code].region; }
+  labelsEl.addEventListener('click', function (e) {
+    var el = e.target.closest('.lbl.hit'); if (!el || !el.__L || !el.__L.mark) return;
+    go('wahrzeichen', el.__L.mark.id);
+  });
 
-  /* ---------------- Kamerafahrt ---------------- */
+  /* ---------------- Kamera ---------------- */
+  var DEG = Math.PI / 180;
+  var HOMEV = { E: 2662000, N: 1176000, d: 470000, hd: -8, p: 36 };
+  var OVERVIEW = { E: 2662000, N: 1184000, d: 420000, hd: 0, p: 50 };
   var KEYS = {
-    hero:       { E: 2662000, N: 1172000, d: 600000, hd: -14, p: 38, ox: 0.04, oy: -0.2 },
-    schweiz:    { E: 2660000, N: 1184000, d: 640000, hd: 0, p: 60, ox: 0.18, oy: 0.02 },
-    lemanique:  { E: 2578000, N: 1118000, d: 270000, hd: -10, p: 50, ox: 0.17, oy: 0.03 },
-    mittelland: { E: 2592000, N: 1196000, d: 240000, hd: 8, p: 48, ox: 0.17, oy: 0.03 },
-    nordwest:   { E: 2636000, N: 1255000, d: 105000, hd: 18, p: 46, ox: 0.17, oy: 0.03 },
-    zuerich:    { E: 2692000, N: 1256000, d: 78000, hd: -12, p: 48, ox: 0.17, oy: 0.03 },
-    zentral:    { E: 2678000, N: 1200000, d: 118000, hd: -28, p: 42, ox: 0.17, oy: 0.03 },
-    ost:        { E: 2747000, N: 1215000, d: 235000, hd: 10, p: 48, ox: 0.17, oy: 0.03 },
-    tessin:     { E: 2712000, N: 1112000, d: 125000, hd: 168, p: 38, ox: 0.17, oy: 0.03 },
-    kantone:    { E: 2660000, N: 1184000, d: 600000, hd: 6, p: 56, ox: 0.24, oy: 0.02 }
+    schweiz:    { E: 2660000, N: 1184000, d: 440000, hd: 0, p: 58 },
+    lemanique:  { E: 2578000, N: 1118000, d: 230000, hd: -10, p: 50 },
+    mittelland: { E: 2592000, N: 1196000, d: 210000, hd: 8, p: 48 },
+    nordwest:   { E: 2636000, N: 1255000, d: 100000, hd: 18, p: 46 },
+    zuerich:    { E: 2692000, N: 1256000, d: 76000, hd: -12, p: 48 },
+    zentral:    { E: 2678000, N: 1200000, d: 112000, hd: -28, p: 42 },
+    ost:        { E: 2747000, N: 1215000, d: 210000, hd: 10, p: 48 },
+    tessin:     { E: 2712000, N: 1112000, d: 115000, hd: 168, p: 38 }
   };
-  var HI = { hero: [], schweiz: [], kantone: [] };
-  Object.keys(KT.REGIONS).forEach(function (r) { HI[r] = KT.REGIONS[r]; });
-  var PAR = {
-    hero: { focus: 0.35, cont: 0.2, cant: 0.25 }, schweiz: { focus: 1, cont: 0.7, cant: 1 }, kantone: { focus: 1, cont: 0.7, cant: 1 }
-  };
-  Object.keys(KT.REGIONS).forEach(function (r) { PAR[r] = { focus: 1, cont: 0.8, cant: 0.9 }; });
-  PAR.explore = { focus: 1, cont: 0.6, cant: 1 }; HI.explore = [];
-
-  function cantonKey(c) {
-    var size = Math.sqrt(c.ha * 10000), cx = (c.bb[0] + c.bb[2]) / 2, cy = (c.bb[1] + c.bb[3]) / 2;
-    return { E: (c.at[0] + cx) / 2, N: (c.at[1] + cy) / 2, d: clamp(size * 2.9, 26000, 280000), hd: 8 + (c.id * 37) % 50 - 25, p: 50, ox: 0.2, oy: 0.03 };
+  var ex = { E: HOMEV.E, N: HOMEV.N, d: HOMEV.d, hd: HOMEV.hd, p: HOMEV.p }, cam = null, flight = null, lastInteract = 0;
+  var topBar = document.querySelector('.top'), homeEl = $('#home');
+  /* freie Fläche neben Panel, Startansicht oder Rundflug-Karte; offset* statt getBoundingClientRect, damit laufende Übergänge nicht stören */
+  function freeArea(W, H) {
+    var top = topBar.offsetHeight, x0 = 0, y0 = top, x1 = W, y1 = H, narrow = narrowMQ.matches;
+    if (narrow) y1 = H - (parseFloat(getComputedStyle(root).getPropertyValue('--tabbar')) || 0);
+    if (body.classList.contains('flying')) return { x0: 0, y0: narrow ? top : 0, x1: W, y1: y1 };
+    if (touring) { if (narrow) y1 = capEl.offsetTop; else x0 = Math.min(W * 0.3, (capEl.offsetLeft + capEl.offsetWidth) * 0.6); }
+    else if (MODE === 'home') y1 = Math.max(top + 120, homeEl.offsetTop + (homeEl.querySelector('.fade').offsetHeight || 0) * 0.6);
+    else if (narrow) y1 = Math.max(top + 100, panel.offsetTop);
+    else x0 = panel.offsetLeft + panel.offsetWidth;
+    return { x0: x0, y0: y0, x1: x1, y1: y1 };
   }
-  function markKey(m) { return { E: m.E, N: m.N, d: 17000, hd: 10, p: 42, ox: 0.2, oy: 0.04 }; }
-  function story() {
-    var y = window.scrollY + window.innerHeight * 0.5, i = 0;
-    while (i < anchors.length - 1 && y >= anchors[i + 1].y) i++;
-    if (i >= anchors.length - 1) return { a: anchors.length - 1, b: anchors.length - 1, t: 0, y: y };
-    var A = anchors[i], B = anchors[i + 1];
-    return { a: i, b: i + 1, t: clamp((y - A.y) / (B.y - A.y), 0, 1), y: y };
+  function viewOffsets(W, H) { var a = freeArea(W, H); return { ox: ((a.x0 + a.x1) / 2 - W / 2) / W, oy: ((a.y0 + a.y1) / 2 - H / 2) / H }; }
+  function fitFactor() {
+    var W = window.innerWidth, H = window.innerHeight, a = freeArea(W, H), w = Math.max(1, a.x1 - a.x0), h = Math.max(1, a.y1 - a.y0), asp = w / h;
+    var f = asp < 1.3 ? clamp(1.3 / asp, 1, 2.6) : 1;
+    return f * clamp(Math.sqrt(H / h), 1, 1.45);
   }
+  function fit(c) { var f = fitFactor(); return { E: c.E, N: c.N, d: c.d * (c.d < 4000 ? Math.min(f, 1.4) : f), hd: c.hd, p: c.p }; }
+  /* Abstand, bei dem ein Rechteck (Breite w, Tiefe h in m) in die freie Fläche passt; Perspektive über den Zuschlag m */
+  function fitBox(bb, hd, p, m, dmin) {
+    var W = window.innerWidth, H = canvas.clientHeight || window.innerHeight, a = freeArea(W, H), fw = Math.max(80, a.x1 - a.x0), fh = Math.max(80, a.y1 - a.y0);
+    var w = bb[2] - bb[0], h = bb[3] - bb[1], th = hd * DEG, ew = Math.abs(w * Math.cos(th)) + Math.abs(h * Math.sin(th)), eh = Math.abs(w * Math.sin(th)) + Math.abs(h * Math.cos(th));
+    var k = H / (2 * Math.tan(camera.fov * DEG / 2));
+    var d = Math.max(ew * k / fw, eh * Math.sin(p * DEG) * k / fh) * (m || 1.12);
+    return { E: (bb[0] + bb[2]) / 2, N: (bb[1] + bb[3]) / 2, d: Math.max(d, dmin || 0), hd: hd, p: p };
+  }
+  function unionBB(codes) {
+    var b = [1e9, 1e9, -1e9, -1e9];
+    codes.forEach(function (c) { var q = BYCODE[c].bb; b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]); b[2] = Math.max(b[2], q[2]); b[3] = Math.max(b[3], q[3]); });
+    return b;
+  }
+  var CHBB = unionBB(KT.ORDER);
+  function clampEx() { ex.E = clamp(ex.E, G.E0 + 1000, G.E1 - 1000); ex.N = clamp(ex.N, G.N0 + 1000, G.N1 - 1000); ex.d = clamp(ex.d, 250, 2400000); ex.p = clamp(ex.p, 8, 88); }
   function angLerp(a, b, t) { var d = ((b - a + 540) % 360) - 180; return a + d * t; }
-  function keyFor(k) {
-    if (k === 'kantone' && selected) {
-      var ms = MARKS[selected.code];
-      if (selMark >= 0 && ms && ms[selMark]) return markKey(ms[selMark]);
-      return cantonKey(selected);
-    }
-    return KEYS[k];
+  function normHd(h) { return ((h % 360) + 540) % 360 - 180; }
+  function flyTo(to) {
+    if (to.hd == null) to.hd = ex.hd; if (to.p == null) to.p = ex.p;
+    if (!cam) { ex.E = to.E; ex.N = to.N; ex.d = to.d; ex.hd = to.hd; ex.p = to.p; clampEx(); flight = null; return; }
+    var from = { E: ex.E, N: ex.N, d: ex.d, hd: ex.hd, p: ex.p };
+    var dist = Math.hypot(to.E - from.E, to.N - from.N);
+    flight = { from: from, to: to, t0: performance.now(), dur: reduce || TEST ? 1 : clamp(900 + dist * 0.012 + Math.abs(Math.log(to.d / from.d)) * 300, 900, 2800),
+      hop: clamp(dist / Math.min(from.d, to.d) * 0.3, 0, 1.4) };
   }
-  function portraitAdjust(c) {
-    var asp = window.innerWidth / window.innerHeight, narrow = window.innerWidth < 760;
-    var f = asp < 1.25 ? clamp(1.25 / asp, 1, 2.3) : 1;
-    var isHero = c === KEYS.hero;
-    return { E: c.E, N: c.N, d: c.d * f, hd: c.hd, p: c.p, ox: narrow ? (isHero ? 0.1 : 0) : c.ox, oy: narrow ? (isHero ? -0.13 : -0.2) : c.oy };
+  function stepFlight(now) {
+    if (!flight) return;
+    var u = clamp((now - flight.t0) / flight.dur, 0, 1), e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    var f = flight.from, t = flight.to, hop = flight.hop * Math.sin(Math.PI * e);
+    ex.E = lerp(f.E, t.E, e); ex.N = lerp(f.N, t.N, e);
+    ex.d = Math.exp(lerp(Math.log(f.d), Math.log(t.d), e)) * (1 + hop);
+    ex.hd = angLerp(f.hd, t.hd, e); ex.p = lerp(f.p, t.p, e);
+    if (u >= 1) flight = null;
   }
-  function desiredCam(st) {
-    var A = portraitAdjust(keyFor(anchors[st.a].key)), B = portraitAdjust(keyFor(anchors[st.b].key));
-    var t = sstep(0.16, 0.84, st.t);
-    var sep = Math.hypot(A.E - B.E, A.N - B.N), hop = clamp(sep / Math.min(A.d, B.d) * 0.22, 0, 0.9) * Math.sin(Math.PI * t);
-    var d = Math.exp(lerp(Math.log(A.d), Math.log(B.d), t)) * (1 + hop);
-    return { E: lerp(A.E, B.E, t), N: lerp(A.N, B.N, t), d: d, hd: angLerp(A.hd, B.hd, t), p: lerp(A.p, B.p, t) - hop * 6, ox: lerp(A.ox, B.ox, t), oy: lerp(A.oy, B.oy, t), t: t };
-  }
-  var cam = null, ptr = { x: 0, y: 0, sx: 0, sy: 0, cx: -1, cy: -1, moved: false, over: false }, drag = { on: false, hd: 0, p: 0, lx: 0, ly: 0, id: null };
+  function keepHd(h) { var n = normHd(ex.hd); return Math.abs(n) > 100 ? h : ex.hd; }
+  function cantonView(c) { return fitBox(c.bb, keepHd(0), 48, 1.2, 22000); }
+  function routeView(r) { return fitBox(r.bb, keepHd(0), 50, 1.18, 16000); }
   function placeCamera(c, W, H) {
-    var th = c.hd * Math.PI / 180, ph = c.p * Math.PI / 180, cp = Math.cos(ph), sp = Math.sin(ph);
+    var th = c.hd * DEG, ph = c.p * DEG, cp = Math.cos(ph), sp = Math.sin(ph);
     var h = groundAt(c.E, c.N), tx = X(c.E), ty = Y(h), tz = Z(c.N);
     var px = tx - Math.sin(th) * cp * c.d, py = ty + sp * c.d, pz = tz + Math.cos(th) * cp * c.d;
-    var gE = px + EC, gN = NC - pz, ground = inGrid(gE, gN) ? Y(groundAt(gE, gN)) : -1000;
-    if (py < ground + Math.min(300, 40 + c.d * 0.08)) py = ground + Math.min(300, 40 + c.d * 0.08);
+    var gE = px + EC, gN = NC - pz, ground = inGrid(gE, gN) ? Y(groundAt(gE, gN)) : -1000, minA = Math.min(300, 40 + c.d * 0.08);
+    if (py < ground + minA) py = ground + minA;
     camera.position.set(px, py, pz);
     camera.lookAt(tx, ty, tz);
     camera.near = clamp(c.d * 0.012, 2, 6000); camera.far = c.d * 5 + 200000;
     camera.aspect = W / H;
     camera.setViewOffset(W, H, -c.ox * W, -c.oy * H, W, H);
     camera.updateProjectionMatrix();
+    camera.updateMatrixWorld(true);
     U.uPx.value = 2 * Math.tan(camera.fov * Math.PI / 360) / H;
     U.uFogNear.value = c.d * 1.1; U.uFogFar.value = c.d * 3.6;
   }
 
-  /* ---------------- Picking ---------------- */
+  /* ---------------- Treffer am Boden ---------------- */
   var ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ids = null, IDW = D.tex[0], IDH = D.tex[1], PXM = (G.E1 - G.E0) / IDW;
   function idAt(E, N) {
     if (!ids || !inGrid(E, N)) return 0;
     var c = Math.min(IDW - 1, Math.floor((E - G.E0) / PXM)), r = Math.min(IDH - 1, Math.floor((G.N1 - N) / PXM));
     return Math.round(ids[(r * IDW + c) * 4] / 9);
   }
+  function setRay(cx, cy) { ndc.set(cx / window.innerWidth * 2 - 1, -(cy / (canvas.clientHeight || window.innerHeight)) * 2 + 1); ray.setFromCamera(ndc, camera); }
   function pick(cx, cy) {
-    ndc.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
-    ray.setFromCamera(ndc, camera);
-    var o = ray.ray.origin, d = ray.ray.direction, t = camera.near, prev = t, step = Math.max(18, cam.d / 320);
+    if (!cam) return null;
+    setRay(cx, cy);
+    var o = ray.ray.origin, d = ray.ray.direction, t = camera.near, prev = t, step = Math.max(12, (cam.d || 5000) / 320);
     for (var s = 0; s < 1800; s++) {
       var x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t, E = x + EC, N = NC - z;
       if (inGrid(E, N) && y <= Y(hAt(E, N))) {
@@ -824,212 +1313,248 @@ function start() {
     }
     return null;
   }
-
-  /* ---------------- Bedienung ---------------- */
-  var tip = $('#tip'), tipT = $('#tipT'), tipA = $('#tipA'), tipB = $('#tipB'), hoverId = 0;
-  function overUI(el) { return el && el.closest && el.closest('.card, .nav, button, a, .tip, .legend, .xbar, label, input, .lbl.poi'); }
-  window.addEventListener('pointermove', function (e) {
-    ptr.x = e.clientX / window.innerWidth * 2 - 1; ptr.y = e.clientY / window.innerHeight * 2 - 1;
-    ptr.cx = e.clientX; ptr.cy = e.clientY; ptr.moved = true; ptr.over = e.pointerType === 'mouse' && !overUI(e.target);
-    if (drag.on && e.pointerId === drag.id) {
-      drag.hd -= (e.clientX - drag.lx) * 0.18; drag.p = clamp(drag.p + (e.clientY - drag.ly) * 0.12, -22, 26);
-      drag.lx = e.clientX; drag.ly = e.clientY;
-    }
-  }, { passive: true });
-  document.addEventListener('pointerleave', function () { ptr.over = false; });
-  window.addEventListener('pointerdown', function (e) {
-    if (EXP.on || e.pointerType !== 'mouse' || e.button !== 0 || overUI(e.target)) return;
-    e.preventDefault();
-    drag.on = true; drag.id = e.pointerId; drag.lx = e.clientX; drag.ly = e.clientY; drag.sx = e.clientX; drag.sy = e.clientY;
-    document.body.style.cursor = 'grabbing';
-  });
-  window.addEventListener('pointerup', function (e) {
-    if (!drag.on) return;
-    drag.on = false; document.body.style.cursor = '';
-    var moved = Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy);
-    if (moved < 5 && hoverId > 0 && inFinale()) selectCanton(BYID[hoverId].code);
-  });
-
-
-  /* ---------------- Erkunden: Umkreisen und freier Flug ---------------- */
-  var DEG = Math.PI / 180, orbit = null, fly = null, keys = {}, flyMul = 1, tapTip = 0;
-  var gesture = null, touchPts = {}, joy = { x: 0, y: 0, id: null, sx: 0, sy: 0 }, lookT = { id: null, lx: 0, ly: 0 };
-  var joyEl = $('#joy'), joyKnob = $('#joyKnob');
-  function clampEN(o) { o.E = clamp(o.E, G.E0 + 2000, G.E1 - 2000); o.N = clamp(o.N, G.N0 + 2000, G.N1 - 2000); }
-  function flyToOrbit() {
-    // Blickpunkt am Boden in Bildmitte; ohne Treffer ein Punkt vor der Kamera
-    var W = window.innerWidth, H = window.innerHeight, hit = pick(W / 2, H / 2), cp = camera.position;
-    var E, N, d;
-    if (hit) { E = hit.E; N = hit.N; d = cp.distanceTo(new THREE.Vector3(X(E), Y(hit.h), Z(N))); }
-    else { var f = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); E = cp.x + EC + f.x * 3000; N = NC - (cp.z + f.z * 3000); d = 3000; }
-    var o = { E: E, N: N, d: clamp(d, 300, 900000), hd: -fly.yaw / DEG, p: clamp(-fly.pitch / DEG, 4, 89) };
-    clampEN(o); return o;
+  function planeAt(cx, cy, h) {
+    setRay(cx, cy);
+    var o = ray.ray.origin, d = ray.ray.direction, yp = Y(h);
+    if (Math.abs(d.y) < 1e-6) return null;
+    var t = (yp - o.y) / d.y; if (t <= 0) return null;
+    return { E: o.x + d.x * t + EC, N: NC - (o.z + d.z * t), h: h };
   }
-  onExplore = function () {
-    if (!cam) return;
-    if (EXP.on) {
-      if (!orbit) orbit = { E: cam.E, N: cam.N, d: cam.d, hd: cam.hd, p: cam.p };
-      if (EXP.mode === 'fly' && !fly) {
-        fly = { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: -cam.hd * DEG, pitch: -cam.p * DEG, v: new THREE.Vector3() };
-      } else if (EXP.mode === 'orbit' && fly) {
-        orbit = flyToOrbit(); fly = null;
-        cam.E = orbit.E; cam.N = orbit.N; cam.d = orbit.d; cam.hd = orbit.hd; cam.p = orbit.p; cam.ox = 0; cam.oy = 0;
-      }
-      $('#explHelp').hidden = false;
-    } else {
-      if (fly) { var o = flyToOrbit(); cam.E = o.E; cam.N = o.N; cam.d = o.d; cam.hd = o.hd; cam.p = o.p; cam.ox = 0; cam.oy = 0; }
-      orbit = null; fly = null; keys = {}; gesture = null; joy.id = null; joyEl.hidden = true;
-      LBL.forEach(function (L) { L.bw = 0; });
+  /* 3D-Wahrzeichen unter dem Zeiger: Abstand zur Strecke Fuss–Spitze im Bild */
+  var mv0 = new THREE.Vector3(), mv1 = new THREE.Vector3();
+  function modelAt(cx, cy, W, H) {
+    var best = null, bd = 26 * 26;
+    for (var i = 0; i < MODELS.length; i++) {
+      var o = MODELS[i]; if (!o.holder.visible || o.vis < 0.5) continue;
+      mv0.copy(o.holder.position).project(camera); if (mv0.z > 1) continue;
+      mv1.copy(o.holder.position); mv1.y += o.h * o.holder.scale.y * 0.9; mv1.project(camera);
+      var ax = (mv0.x + 1) / 2 * W, ay = (1 - mv0.y) / 2 * H, bx = (mv1.x + 1) / 2 * W, by = (1 - mv1.y) / 2 * H;
+      var vx = bx - ax, vy = by - ay, l2 = vx * vx + vy * vy || 1, t = clamp(((cx - ax) * vx + (cy - ay) * vy) / l2, 0, 1);
+      var qx = ax + vx * t - cx, qy = ay + vy * t - cy, e = qx * qx + qy * qy;
+      if (e < bd) { bd = e; best = o; }
     }
-  };
-  exploreAt = function (c) {
-    if (!cam) return;
-    if (!orbit) onExplore();
-    if (fly) setExplore(true, 'orbit');
-    var k = cantonKey(c);
-    orbit.E = k.E; orbit.N = k.N; orbit.d = Math.min(k.d * 0.55, 60000); orbit.p = 42; orbit.hd = k.hd;
-  };
-  function inField(e) { var t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
+    return best;
+  }
+
+  /* ---------------- Bedienung der Karte: ziehen verschiebt, rechte Taste oder zwei Finger drehen, Rad oder zwei Finger zoomen ---------------- */
+  var tip = $('#tip'), tipT = $('#tipT'), tipA = $('#tipA'), tipB = $('#tipB'), hoverId = 0, tapTip = 0;
+  var ptr = { cx: -1, cy: -1, moved: false, over: false }, PTS = {}, drag = { mode: null, g: null, lx: 0, ly: 0, sx: 0, sy: 0, t0: 0, moved: 0 };
+  function nPts() { return Object.keys(PTS).length; }
+  function syncCamNow() { if (!cam) return; cam.E = ex.E; cam.N = ex.N; cam.d = ex.d; cam.hd = ex.hd; cam.p = ex.p; placeCamera(cam, window.innerWidth, canvas.clientHeight || window.innerHeight); }
+  function panTo(cx, cy) {
+    if (!drag.g) return;
+    var p = planeAt(cx, cy, drag.g.h); if (!p) return;
+    ex.E += drag.g.E - p.E; ex.N += drag.g.N - p.N; clampEx(); syncCamNow();
+  }
+  function pinchState() {
+    var k = Object.keys(PTS), a = PTS[k[0]], b = PTS[k[1]];
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  }
+  function beginPan(x, y) { drag.mode = 'pan'; drag.g = pick(x, y) || planeAt(x, y, groundAt(ex.E, ex.N)); }
+  function interrupt() { lastInteract = performance.now(); if (touring) stopTour(true); flight = null; }
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!cam || pendingFly) { e.preventDefault(); return; }
+    if (fly) { flyDown(e); return; }
+    interrupt();
+    try { canvas.setPointerCapture(e.pointerId); } catch (er) {}
+    PTS[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var n = nPts();
+    drag.lx = e.clientX; drag.ly = e.clientY;
+    if (n === 1) {
+      drag.sx = e.clientX; drag.sy = e.clientY; drag.t0 = performance.now(); drag.moved = 0;
+      if (e.pointerType === 'mouse' && (e.button === 2 || e.button === 1 || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey)) drag.mode = 'rot';
+      else if (e.pointerType !== 'mouse' || e.button === 0) beginPan(e.clientX, e.clientY);
+      if (e.pointerType === 'mouse') body.style.cursor = drag.mode === 'rot' ? 'move' : 'grabbing';
+    } else if (n === 2) {
+      drag.mode = 'pinch'; drag.moved = 99; drag.p0 = pinchState(); drag.d0 = ex.d; drag.hd0 = ex.hd; drag.pp0 = ex.p;
+    }
+    tip.classList.remove('on');
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    ptr.cx = e.clientX; ptr.cy = e.clientY; ptr.moved = true; ptr.over = e.pointerType === 'mouse';
+    if (fly) { flyMove(e); return; }
+    if (!PTS[e.pointerId]) return;
+    PTS[e.pointerId] = { x: e.clientX, y: e.clientY };
+    lastInteract = performance.now();
+    var dx = e.clientX - drag.lx, dy = e.clientY - drag.ly;
+    drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy));
+    if (drag.mode === 'pan' && nPts() === 1) panTo(e.clientX, e.clientY);
+    else if (drag.mode === 'rot') { ex.hd -= dx * 0.25; ex.p = clamp(ex.p + dy * 0.2, 8, 88); }
+    else if (drag.mode === 'pinch' && nPts() >= 2) {
+      var s = pinchState();
+      ex.d = clamp(drag.d0 * drag.p0.dist / Math.max(20, s.dist), 250, 2400000);
+      ex.hd = drag.hd0 - (s.ang - drag.p0.ang) / DEG;
+      ex.p = clamp(drag.pp0 + (s.my - drag.p0.my) * 0.2, 8, 88);
+      clampEx(); syncCamNow();
+    }
+    drag.lx = e.clientX; drag.ly = e.clientY;
+  });
+  function endPointer(e) {
+    if (fly) { flyUp(e); return; }
+    if (!PTS[e.pointerId]) return;
+    delete PTS[e.pointerId];
+    var n = nPts();
+    if (n === 1 && drag.mode === 'pinch') { var k = Object.keys(PTS)[0]; drag.lx = PTS[k].x; drag.ly = PTS[k].y; beginPan(PTS[k].x, PTS[k].y); drag.moved = 99; return; }
+    if (n > 0) return;
+    var wasClick = drag.moved < 6 && performance.now() - drag.t0 < 500 && e.type === 'pointerup';
+    drag.mode = null; drag.g = null; body.style.cursor = '';
+    if (wasClick) mapClick(e.clientX, e.clientY, e.pointerType);
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('pointerleave', function () { ptr.over = false; ptr.moved = true; });
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+    if (fly) { flyMul = clamp(flyMul * Math.exp(-clamp(dy, -240, 240) * 0.0016), 0.08, 25); return; }
+    if (pendingFly) return;
+    interrupt();
+    if (e.ctrlKey) dy *= 3;
+    zoomAt(e.clientX, e.clientY, Math.exp(clamp(dy, -240, 240) * 0.0016));
+  }, { passive: false });
+  function zoomAt(x, y, f) {
+    var nd = clamp(ex.d * f, 250, 2400000), g = x != null ? pick(x, y) : null;
+    if (g) { var k = 1 - nd / ex.d; ex.E += (g.E - ex.E) * k; ex.N += (g.N - ex.N) * k; }
+    ex.d = nd; clampEx();
+  }
+  canvas.addEventListener('keydown', function (e) {
+    if (fly || pendingFly) return;
+    var k = e.key, step = ex.d * 0.12, th = ex.hd * DEG, fE = Math.sin(th), fN = Math.cos(th), rE = Math.cos(th), rN = -Math.sin(th), used = true;
+    if (k === 'ArrowUp') { ex.E += fE * step; ex.N += fN * step; }
+    else if (k === 'ArrowDown') { ex.E -= fE * step; ex.N -= fN * step; }
+    else if (k === 'ArrowLeft') { ex.E -= rE * step; ex.N -= rN * step; }
+    else if (k === 'ArrowRight') { ex.E += rE * step; ex.N += rN * step; }
+    else if (k === '+' || k === '=') zoomAt(null, null, 0.7);
+    else if (k === '-' || k === '_') zoomAt(null, null, 1.4);
+    else if (k === 'q' || k === 'Q') ex.hd -= 10;
+    else if (k === 'e' || k === 'E') ex.hd += 10;
+    else if (k === 'PageUp') ex.p = clamp(ex.p + 6, 8, 88);
+    else if (k === 'PageDown') ex.p = clamp(ex.p - 6, 8, 88);
+    else used = false;
+    if (used) { e.preventDefault(); interrupt(); clampEx(); }
+  });
+  function mapClick(x, y, type) {
+    var W = window.innerWidth, H = canvas.clientHeight || window.innerHeight;
+    var ph = poiAt(x, y, W, H);
+    if (ph) { go('familien', String(ph.i)); return; }
+    var mo = modelAt(x, y, W, H);
+    if (mo) { go('wahrzeichen', mo.m.id); return; }
+    var g = pick(x, y), id = g ? idAt(g.E, g.N) : 0;
+    if (!id) return;
+    var code = BYID[id].code;
+    if (MODE === 'home' || MODE === 'kantone') { go('kantone', code.toLowerCase()); return; }
+    if (SEL && SEL.kind === 'route') return;
+    if (selected && selected.code === code) { if (SEL) go(MODE, null); return; }
+    setCanton(code, { noHash: true, noFly: true, noRender: true });
+    go(MODE, null);
+  }
+
+  /* ---------------- Freier Flug wie im Spiel: WASD und Maus, auf dem Handy Joystick ---------------- */
+  var fly = null, pendingFly = false, keys = {}, flyMul = 1, joy = { x: 0, y: 0, id: null, sx: 0, sy: 0 }, lookT = { id: null, lx: 0, ly: 0 }, mlook = null;
+  var joyEl = $('#joy'), joyKnob = $('#joyKnob'), flyKeysEl = $('#flyKeys');
+  flyKeysEl.innerHTML = fine
+    ? '<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> fliegen · Klick fängt die Maus · <kbd>E</kbd>/<kbd>Q</kbd> steigen, sinken · <kbd>⇧</kbd> schnell · Rad Tempo · <kbd>Esc</kbd> Maus frei'
+    : 'Links ziehen: fliegen · rechts ziehen: umschauen · ▲▼ steigen, sinken';
+  function startFly(it) {
+    if (!cam || fly) return;
+    if (touring) stopTour(true);
+    showLegend(false);
+    body.classList.add('flying'); $('#tFly').setAttribute('aria-pressed', 'true');
+    tip.classList.remove('on');
+    var t = null;
+    if (it && it.kind === 'kanton') { var v = cantonView(it.c); t = { E: v.E, N: v.N, d: clamp(v.d * 0.35, 9000, 40000), p: 14 }; }
+    else if (it && it.E) t = { E: it.E, N: it.N, d: it.kind === 'route' ? 12000 : 4500, p: 14 };
+    else if (cam.d > 30000 || ex.p > 40) t = { E: ex.E, N: ex.N, d: clamp(ex.d * 0.4, 6000, 26000), p: 14 };
+    pendingFly = true;
+    if (t) { t.hd = ex.hd; flyTo(t); }
+  }
+  function enterFly() {
+    pendingFly = false;
+    if (!body.classList.contains('flying')) return;
+    camera.updateMatrixWorld(true);
+    fly = { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: -cam.hd * DEG, pitch: -cam.p * DEG, v: new THREE.Vector3() };
+    // erster Blick leicht unter den Horizont statt steil nach unten
+    fly.pitch = clamp(fly.pitch, -0.6, 0.2);
+    keys = {}; flyMul = 1;
+  }
+  function stopFly() {
+    if (!body.classList.contains('flying')) return;
+    if (document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) {} }
+    if (fly && cam) {
+      var o = flyToOrbit();
+      ex.E = cam.E = o.E; ex.N = cam.N = o.N; ex.d = cam.d = o.d; ex.hd = cam.hd = o.hd; ex.p = cam.p = o.p; clampEx();
+    }
+    fly = null; pendingFly = false; flight = null; keys = {}; mlook = null; joy.id = null; lookT.id = null; joyEl.hidden = true;
+    body.classList.remove('flying'); $('#tFly').setAttribute('aria-pressed', 'false');
+    LBL.forEach(function (L) { L.bw = 0; });
+  }
+  function flyToOrbit() {
+    var cp = camera.position, pt = Math.max(-fly.pitch, 12 * DEG), c = Math.cos(pt);
+    var dx = -Math.sin(fly.yaw) * c, dy = -Math.sin(pt), dz = -Math.cos(fly.yaw) * c, t = 0, step = Math.max(20, (cp.y - Y(groundAt(cp.x + EC, NC - cp.z))) / 40), hitT = -1;
+    for (var s = 0; s < 4000 && t < 600000; s++) {
+      t += step;
+      var E = cp.x + dx * t + EC, N = NC - (cp.z + dz * t);
+      if (cp.y + dy * t <= Y(inGrid(E, N) ? groundAt(E, N) : 400)) { hitT = t; break; }
+    }
+    if (hitT < 0) hitT = Math.max(800, (cp.y - Y(400)) / Math.sin(pt));
+    var tE = cp.x + dx * hitT + EC, tN = NC - (cp.z + dz * hitT);
+    var d = Math.hypot(cp.x - X(tE), cp.y - Y(groundAt(tE, tN)), cp.z - Z(tN));
+    return { E: tE, N: tN, d: clamp(d, 300, 2400000), hd: -fly.yaw / DEG, p: clamp(pt / DEG, 8, 88) };
+  }
+  function flyDown(e) {
+    if (e.pointerType === 'mouse') {
+      if (fine && canvas.requestPointerLock && !document.pointerLockElement && e.button === 0) { try { var pr = canvas.requestPointerLock(); if (pr && pr.catch) pr.catch(function () {}); } catch (er) {} }
+      mlook = { id: e.pointerId, lx: e.clientX, ly: e.clientY };
+      try { canvas.setPointerCapture(e.pointerId); } catch (er) {}
+      e.preventDefault(); return;
+    }
+    if (e.clientX < window.innerWidth * 0.45 && joy.id === null) {
+      joy.id = e.pointerId; joy.sx = e.clientX; joy.sy = e.clientY; joy.x = joy.y = 0;
+      joyEl.hidden = false; joyEl.style.transform = 'translate(' + (e.clientX - 60) + 'px,' + (e.clientY - 60) + 'px)'; joyKnob.style.transform = '';
+    } else if (lookT.id === null) { lookT.id = e.pointerId; lookT.lx = e.clientX; lookT.ly = e.clientY; }
+    try { canvas.setPointerCapture(e.pointerId); } catch (er) {}
+    e.preventDefault();
+  }
+  function flyMove(e) {
+    if (!fly) return;
+    if (e.pointerType === 'mouse') {
+      if (document.pointerLockElement === canvas) { fly.yaw -= e.movementX * 0.0022; fly.pitch = clamp(fly.pitch - e.movementY * 0.0022, -1.5, 1.5); return; }
+      if (!mlook || mlook.id !== e.pointerId) return;
+      fly.yaw -= (e.clientX - mlook.lx) * 0.004; fly.pitch = clamp(fly.pitch - (e.clientY - mlook.ly) * 0.004, -1.5, 1.5);
+      mlook.lx = e.clientX; mlook.ly = e.clientY; return;
+    }
+    if (e.pointerId === joy.id) {
+      var jx = clamp((e.clientX - joy.sx) / 50, -1, 1), jy = clamp((e.clientY - joy.sy) / 50, -1, 1);
+      joy.x = jx; joy.y = -jy; joyKnob.style.transform = 'translate(' + (jx * 34) + 'px,' + (jy * 34) + 'px)';
+    } else if (e.pointerId === lookT.id) {
+      fly.yaw -= (e.clientX - lookT.lx) * 0.005; fly.pitch = clamp(fly.pitch - (e.clientY - lookT.ly) * 0.005, -1.5, 1.5);
+      lookT.lx = e.clientX; lookT.ly = e.clientY;
+    }
+  }
+  function flyUp(e) {
+    if (mlook && mlook.id === e.pointerId) mlook = null;
+    if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; joyEl.hidden = true; }
+    if (e.pointerId === lookT.id) lookT.id = null;
+  }
+  function inField(e) { var t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable); }
   window.addEventListener('keydown', function (e) {
-    if (!EXP.on || inField(e)) return;
+    if (!fly || inField(e)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) { keys = {}; return; }
+    var onCtl = e.target && e.target.closest && e.target.closest('button, a, select, input');
+    if (onCtl && (e.code === 'Space' || e.code === 'Enter')) return;
     keys[e.code] = true;
     if (/^(Arrow|Space)/.test(e.code)) e.preventDefault();
-    if (e.code === 'KeyF' && !e.repeat && EXP.mode === 'fly' && e.shiftKey) setExplore(true, 'orbit');
   });
   window.addEventListener('keyup', function (e) { keys[e.code] = false; });
   window.addEventListener('blur', function () { keys = {}; });
-  canvas.addEventListener('contextmenu', function (e) { if (EXP.on) e.preventDefault(); });
-  window.addEventListener('wheel', function (e) {
-    if (!EXP.on || overUI(e.target)) return;
-    e.preventDefault();
-    var dy = e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
-    if (EXP.mode === 'orbit') orbit.d = clamp(orbit.d * Math.exp(dy * 0.0012), 250, 900000);
-    else flyMul = clamp(flyMul * Math.exp(-dy * 0.0012), 0.08, 25);
-  }, { passive: false });
-  canvas.addEventListener('dblclick', function (e) {
-    if (!EXP.on || EXP.mode !== 'orbit') return;
-    var hit = pick(e.clientX, e.clientY); if (!hit) return;
-    orbit.E = hit.E; orbit.N = hit.N; orbit.d = Math.min(orbit.d, 6000);
-  });
-  function exploreDown(e) {
-    if (!EXP.on || overUI(e.target)) return;
-    if (e.pointerType === 'mouse') {
-      if (EXP.mode === 'fly') {
-        if (fine && canvas.requestPointerLock && !document.pointerLockElement) { try { canvas.requestPointerLock(); } catch (er) {} }
-        gesture = { kind: 'look', id: e.pointerId, lx: e.clientX, ly: e.clientY, sx: e.clientX, sy: e.clientY };
-      } else {
-        gesture = { kind: (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'rot', id: e.pointerId, lx: e.clientX, ly: e.clientY, sx: e.clientX, sy: e.clientY };
-      }
-      e.preventDefault();
-      return;
-    }
-    // Touch
-    touchPts[e.pointerId] = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY };
-    if (EXP.mode === 'fly') {
-      if (e.clientX < window.innerWidth * 0.42 && joy.id === null) {
-        joy.id = e.pointerId; joy.sx = e.clientX; joy.sy = e.clientY; joy.x = joy.y = 0;
-        joyEl.hidden = false; joyEl.style.transform = 'translate(' + (e.clientX - 60) + 'px,' + (e.clientY - 60) + 'px)'; joyKnob.style.transform = '';
-      } else if (lookT.id === null) { lookT.id = e.pointerId; lookT.lx = e.clientX; lookT.ly = e.clientY; }
-    }
-    e.preventDefault();
-  }
-  function exploreMove(e) {
-    if (!EXP.on) return;
-    if (e.pointerType === 'mouse') {
-      var locked = document.pointerLockElement === canvas;
-      if (EXP.mode === 'fly' && locked) { fly.yaw -= e.movementX * 0.0022; fly.pitch = clamp(fly.pitch - e.movementY * 0.0022, -1.5, 1.5); return; }
-      if (!gesture || gesture.id !== e.pointerId) return;
-      var dx = e.clientX - gesture.lx, dy = e.clientY - gesture.ly; gesture.lx = e.clientX; gesture.ly = e.clientY;
-      if (EXP.mode === 'fly') { fly.yaw -= dx * 0.004; fly.pitch = clamp(fly.pitch - dy * 0.004, -1.5, 1.5); }
-      else if (gesture.kind === 'rot') { orbit.hd -= dx * 0.28; orbit.p = clamp(orbit.p + dy * 0.22, 4, 89); }
-      else panBy(dx, dy);
-      return;
-    }
-    var tp = touchPts[e.pointerId]; if (!tp) return;
-    var px = tp.x, py = tp.y; tp.x = e.clientX; tp.y = e.clientY;
-    if (EXP.mode === 'fly') {
-      if (e.pointerId === joy.id) {
-        var jx = clamp((e.clientX - joy.sx) / 50, -1, 1), jy = clamp((e.clientY - joy.sy) / 50, -1, 1);
-        joy.x = jx; joy.y = -jy; joyKnob.style.transform = 'translate(' + (jx * 34) + 'px,' + (jy * 34) + 'px)';
-      } else if (e.pointerId === lookT.id) { fly.yaw -= (e.clientX - px) * 0.005; fly.pitch = clamp(fly.pitch - (e.clientY - py) * 0.005, -1.5, 1.5); }
-      return;
-    }
-    var idsT = Object.keys(touchPts);
-    if (idsT.length === 1) { orbit.hd -= (e.clientX - px) * 0.3; orbit.p = clamp(orbit.p + (e.clientY - py) * 0.24, 4, 89); }
-    else if (idsT.length >= 2) {
-      var a = touchPts[idsT[0]], b = touchPts[idsT[1]];
-      var dNow = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      if (gesture && gesture.kind === 'pinch') {
-        if (gesture.d > 0 && dNow > 0) orbit.d = clamp(orbit.d * gesture.d / dNow, 250, 900000);
-        panBy(mx - gesture.mx, my - gesture.my);
-      }
-      gesture = { kind: 'pinch', d: dNow, mx: mx, my: my };
-    }
-  }
-  function exploreUp(e) {
-    if (!EXP.on) return;
-    if (e.pointerType === 'mouse') {
-      if (gesture && gesture.id === e.pointerId) {
-        var moved = Math.hypot(e.clientX - gesture.sx, e.clientY - gesture.sy);
-        if (moved < 5 && !document.pointerLockElement) tapAt(e.clientX, e.clientY);
-      }
-      gesture = null; return;
-    }
-    var tp = touchPts[e.pointerId];
-    if (tp && Math.hypot(tp.x - tp.sx, tp.y - tp.sy) < 8 && Object.keys(touchPts).length === 1 && e.pointerId !== joy.id) tapAt(e.clientX, e.clientY);
-    delete touchPts[e.pointerId];
-    if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; joyEl.hidden = true; }
-    if (e.pointerId === lookT.id) lookT.id = null;
-    if (Object.keys(touchPts).length < 2 && gesture && gesture.kind === 'pinch') gesture = null;
-  }
   ['flyUp', 'flyDown'].forEach(function (k) {
-    var b = document.getElementById(k); if (!b) return;
+    var b = document.getElementById(k);
     b.addEventListener('pointerdown', function (e) { keys[k] = true; e.preventDefault(); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { b.addEventListener(ev, function () { keys[k] = false; }); });
   });
-  window.addEventListener('pointerdown', exploreDown);
-  window.addEventListener('pointermove', exploreMove, { passive: true });
-  window.addEventListener('pointerup', exploreUp);
-  window.addEventListener('pointercancel', exploreUp);
-  function panBy(dx, dy) {
-    var th = orbit.hd * DEG, k = 0.536 * orbit.d / window.innerHeight;
-    var fE = Math.sin(th), fN = Math.cos(th), rE = Math.cos(th), rN = -Math.sin(th);
-    orbit.E -= (rE * dx - fE * dy) * k; orbit.N -= (rN * dx - fN * dy) * k; clampEN(orbit);
-  }
-  function showPoiTip(hit) {
-    var c = POICAT[hit.it.c];
-    tipT.innerHTML = '<img src="' + ICONS.url[c.k] + '" alt="">' + esc(hit.it.name || c.one);
-    tipA.textContent = hit.it.name ? c.one : 'ohne Namen in den Daten';
-    tipB.textContent = swiss(hit.it.h) + ' m ü. M. · ' + swiss(hit.it.E) + ' / ' + swiss(hit.it.N);
-    var tx = hit.sx + 16, ty = hit.sy + 16;
-    if (tx > window.innerWidth - 250) tx = hit.sx - 250; if (ty > window.innerHeight - 90) ty = hit.sy - 90;
-    tip.style.transform = 'translate(' + tx + 'px,' + ty + 'px)'; tip.classList.add('on');
-  }
-  function tapAt(x, y) {
-    var hit = poiAt(x, y, window.innerWidth, window.innerHeight);
-    if (hit) { showPoiTip(hit); poiMat.uniforms.uHot.value = hit.i; tapTip = performance.now() + 4000;
-      if (EXP.mode === 'orbit') { orbit.E = hit.it.E; orbit.N = hit.it.N; orbit.d = Math.min(orbit.d, 4000); } return; }
-  }
-  labelsEl.addEventListener('click', function (e) {
-    var el = e.target.closest('.lbl.poi'); if (!el || !el.__L || !EXP.on) return;
-    var L = el.__L, m = MARKS[L.code][L.mi];
-    if (EXP.mode === 'fly') setExplore(true, 'orbit');
-    orbit.E = m.E; orbit.N = m.N; orbit.d = 2600; orbit.p = 32;
-  });
-  function stepExplore(dt) {
-    if (EXP.mode === 'orbit') {
-      var th = orbit.hd * DEG, mv = orbit.d * 0.9 * dt * (keys.ShiftLeft || keys.ShiftRight ? 2.5 : 1);
-      var fE = Math.sin(th), fN = Math.cos(th), rE = Math.cos(th), rN = -Math.sin(th);
-      var f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
-      var r = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-      orbit.E += (fE * f + rE * r) * mv; orbit.N += (fN * f + rN * r) * mv;
-      if (keys.KeyQ) orbit.hd -= 70 * dt; if (keys.KeyE) orbit.hd += 70 * dt;
-      if (keys.KeyR || keys.PageUp) orbit.d = Math.max(250, orbit.d * Math.exp(-dt * 1.4));
-      if (keys.KeyF || keys.PageDown) orbit.d = Math.min(900000, orbit.d * Math.exp(dt * 1.4));
-      clampEN(orbit);
-      return { E: orbit.E, N: orbit.N, d: orbit.d, hd: orbit.hd, p: orbit.p, ox: 0, oy: 0, t: 0 };
-    }
-    // freier Flug
+  function stepFly(dt) {
     var cp = Math.cos(fly.pitch), fwd = new THREE.Vector3(-Math.sin(fly.yaw) * cp, Math.sin(fly.pitch), -Math.cos(fly.yaw) * cp);
     var right = new THREE.Vector3(Math.cos(fly.yaw), 0, -Math.sin(fly.yaw));
     var gE = fly.x + EC, gN = NC - fly.z, gY = inGrid(gE, gN) ? Y(groundAt(gE, gN)) : Y(400), alt = Math.max(1, fly.y - gY);
@@ -1045,8 +1570,7 @@ function start() {
     fly.x += fly.v.x * dt; fly.y += fly.v.y * dt; fly.z += fly.v.z * dt;
     fly.x = clamp(fly.x, X(G.E0 - 20000), X(G.E1 + 20000)); fly.z = clamp(fly.z, Z(G.N1 + 20000), Z(G.N0 - 20000));
     gE = fly.x + EC; gN = NC - fly.z; gY = inGrid(gE, gN) ? Y(groundAt(gE, gN)) : Y(400);
-    fly.y = clamp(fly.y, gY + 18, Y(60000));
-    return null;
+    fly.y = clamp(fly.y, gY + (small ? 70 : 36), Y(60000));
   }
   function placeFly(W, H) {
     camera.clearViewOffset();
@@ -1054,81 +1578,106 @@ function start() {
     camera.rotation.set(fly.pitch, fly.yaw, 0, 'YXZ');
     var gE = fly.x + EC, gN = NC - fly.z, gY = inGrid(gE, gN) ? Y(groundAt(gE, gN)) : 0, alt = Math.max(1, fly.y - gY);
     camera.near = clamp(alt * 0.02, 1.5, 400); camera.far = 1200000;
-    camera.aspect = W / H; camera.updateProjectionMatrix();
+    camera.aspect = W / H; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
     U.uPx.value = 2 * Math.tan(camera.fov * Math.PI / 360) / H;
     U.uFogNear.value = Math.max(22000, alt * 14); U.uFogFar.value = U.uFogNear.value * 4.5;
-    // für Kantonsanzeige, Nahkacheln und HUD: Punkt am Boden vor der Kamera
     var ahead = Math.min(alt * 2 + 2500, 25000);
     cam.E = gE - Math.sin(fly.yaw) * ahead; cam.N = gN + Math.cos(fly.yaw) * ahead; cam.d = alt * 1.4 + 1500;
-    cam.hd = -fly.yaw / DEG; cam.p = -fly.pitch / DEG; cam.alt = alt;
+    cam.hd = -fly.yaw / DEG; cam.p = -fly.pitch / DEG;
+    ex.E = cam.E; ex.N = cam.N; ex.d = cam.d; ex.hd = cam.hd;
     return alt;
   }
+  document.addEventListener('pointerlockchange', function () { if (!document.pointerLockElement) mlook = null; });
+
+  /* ---------------- Tooltip ---------------- */
+  function placeTip(x, y) {
+    var W = window.innerWidth, tx = x + 18, ty = y + 18;
+    if (tx > W - 300) tx = x - 300; if (ty > window.innerHeight - 100) ty = y - 100;
+    tip.style.transform = 'translate(' + tx + 'px,' + ty + 'px)'; tip.classList.add('on');
+  }
+  function showPoiTip(hit) {
+    var c = POICAT[hit.it.c];
+    tipT.innerHTML = '<img src="' + ICONS.url[c.k] + '" alt="">' + esc(poiTitle(hit.it));
+    tipA.textContent = hit.it.name ? c.one + (hit.it.code ? ' · ' + KC[hit.it.code].name : '') : 'ohne Namen in den Daten';
+    tipB.textContent = swiss(hit.it.h) + ' m ü. M. · Klick für Details';
+  }
+
+  /* ---------------- Schnittstelle für die Oberfläche ---------------- */
+  MAP.ready = true;
+  MAP.flyHome = function () { var n = narrowMQ.matches; flyTo(fitBox(CHBB, HOMEV.hd, n ? 50 : HOMEV.p, n ? 0.98 : 1.04)); };
+  MAP.flyOverview = function () { flyTo(fitBox(CHBB, keepHd(OVERVIEW.hd), OVERVIEW.p, 1.06)); };
+  MAP.flyCanton = function (c, home) { var v = cantonView(c); if (home) { v.d *= 1.15; v.p = 46; } flyTo(v); };
+  MAP.flyMark = function (m, close) { flyTo(fit({ E: m.E, N: m.N, d: close ? 2600 : 9000, hd: ex.hd, p: close ? 34 : 42 })); };
+  MAP.flyPOI = function (p, close) { flyTo(fit({ E: p.E, N: p.N, d: close ? 1300 : 4200, hd: ex.hd, p: close ? 40 : 46 })); };
+  MAP.flyRoute = function (r) { flyTo(routeView(r)); };
+  MAP.flyKey = function (k) { var c = KEYS[k]; if (c) flyTo(fitBox(k === 'schweiz' ? CHBB : unionBB(KT.REGIONS[k]), c.hd, c.p, 1.1)); };
+  MAP.setRoute = function (r) { routeSel = r ? routeRibbon(r) : null; if (routeSel) routeSel.userData.draw = 0; };
+  MAP.setHotPOI = function (i) { hotPOI = i; poiMat.uniforms.uHot.value = i; };
+  MAP.center = function () { return cam ? { E: ex.E, N: ex.N, d: ex.d } : null; };
+  MAP.onPOI = function () { if (ready) buildPOI(); };
+  MAP.onRoutes = function () { if (ready) buildRoutes(); };
+  MAP.startFly = startFly; MAP.stopFly = stopFly;
+  MAP.flying = function () { return body.classList.contains('flying'); };
+  MAP.zoom = function (f) { interrupt(); flyTo({ E: ex.E, N: ex.N, d: clamp(ex.d * f, 250, 2400000), hd: ex.hd, p: ex.p }); };
+  MAP.north = function () { interrupt(); flyTo({ E: ex.E, N: ex.N, d: ex.d, hd: 0, p: ex.p }); };
+  MAP.heightAt = function (E, N) { return ready ? groundAt(E, N) : null; };
+  layerHooks.push(function (k, v) { if (detail && (k === 'sat' || k === 'trails')) detail.set(k, v); });
+  $('#pfootL').textContent = 'swisstopo · SchweizMobil · BAV · OSM';
 
   /* ---------------- Bildschleife ---------------- */
-  var HUDtick = 0, tReady = 0, last = performance.now(), navLinks = Array.prototype.slice.call(document.querySelectorAll('#nav a')),
-      prog = $('#prog'), mark = $('#mark'), north = $('#north'), docH = 1, ready = false, hiCur = new Array(NK).fill(0), cur = { focus: 0.35, cont: 0.2, cant: 0.25 };
-  var tmpV = new THREE.Vector3(), LV = { borders: 1, water: 1, trails: 1 };
+  var HUDtick = 0, tReady = 0, last = performance.now(), north = $('#north'), attribEl = $('#attrib'), ready = false, hotPOI = -1;
+  var hiCur = new Array(NK).fill(0), cur = { focus: 0.6, cont: 0.45, cant: 0.6 };
+  var tmpV = new THREE.Vector3(), LV = { borders: 1, water: 1, trails: 1 }, frustum = new THREE.Frustum(), pm = new THREE.Matrix4();
   var prCap = small ? 1.5 : 2, frameTimes = [], prLowered = false;
   function applyPR(W, H) { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, prCap, Math.sqrt(3.4e6 / (W * H)))); }
   function resize() {
     var W = window.innerWidth, H = canvas.clientHeight || window.innerHeight;
     applyPR(W, H);
     renderer.setSize(W, H, false);
-    measure();
     LBL.forEach(function (L) { L.bw = 0; });
-    docH = document.documentElement.scrollHeight;
   }
   window.addEventListener('resize', resize);
-  window.addEventListener('load', resize);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
-  window.__onSelect = function () { LBL.forEach(function (L) { L.bw = 0; }); };
 
   function frame(now) {
     var rawDt = (now - last) / 1000, dt = Math.min(0.05, rawDt); last = now;
     if (!TEST && !prLowered && ready && rawDt > 0 && rawDt < 0.5) { frameTimes.push(rawDt); if (frameTimes.length > 90) { frameTimes.shift(); var avg = frameTimes.reduce(function (a, b) { return a + b; }, 0) / frameTimes.length; if (avg > 0.034) { prLowered = true; prCap = Math.max(1, prCap * 0.7); resize(); } } }
     var W = window.innerWidth, H = canvas.clientHeight || window.innerHeight;
     if (!reduce) U.uTime.value = now / 1000;
-    var st = story(), want = desiredCam(st);
-    var keyA = anchors[st.a].key, keyB = anchors[st.b].key, tb = want.t;
-    var heroW = keyA === 'hero' ? 1 - tb : 0;
-    if (EXP.on && cam && !orbit && !fly) onExplore();
-    var XP = EXP.on && cam && (orbit || fly);
-    if (XP) { keyA = keyB = 'explore'; tb = 0; heroW = 0; }
-    ptr.sx = lerp(ptr.sx, fine && !XP ? ptr.x : 0, 1 - Math.exp(-dt * 2.5)); ptr.sy = lerp(ptr.sy, fine && !XP ? ptr.y : 0, 1 - Math.exp(-dt * 2.5));
-    if (!drag.on && (!inFinale() || XP)) { drag.hd *= Math.exp(-dt * 1.2); drag.p *= Math.exp(-dt * 1.2); }
-    if (XP) { var ew = stepExplore(dt); if (ew) want = ew; }
-    else {
-      want.hd += ptr.sx * 4 + drag.hd + (reduce ? 0 : Math.sin(now / 1000 * 0.09) * 7 * heroW);
-      want.p = clamp(want.p - ptr.sy * 2.5 + drag.p, 12, 82);
+    stepFlight(now); stepTour(now);
+    if (MODE === 'home' && !touring && !fly && !pendingFly && !drag.mode && !flight && now - lastInteract > 2500 && !reduce && !TEST) ex.hd += dt * 1.6;
+    var off = viewOffsets(W, H);
+    if (!cam) {
+      cam = { E: ex.E, N: ex.N, d: ex.d, hd: ex.hd, p: ex.p, ox: off.ox, oy: off.oy };
+      if (!reduce && !TEST) { cam.d *= 1.4; cam.hd -= 26; cam.p += 12; }
     }
-    if (!cam) { cam = { E: want.E, N: want.N, d: want.d, hd: want.hd, p: want.p, ox: want.ox, oy: want.oy };
-      if (!reduce && !TEST && st.a === 0 && st.t < 0.05) { cam.d *= 1.4; cam.hd -= 24; cam.p += 12; } }
-    var kf = TEST ? 1 : 1 - Math.exp(-dt * 3.2), kc = XP ? (TEST ? 1 : 1 - Math.exp(-dt * 9)) : kf;
+    var cdt = Math.min(0.25, Math.max(0, rawDt)), kf = (TEST || drag.mode) ? 1 : 1 - Math.exp(-cdt * (flight ? 14 : 6)), ko = TEST ? 1 : 1 - Math.exp(-cdt * 6);
     stepTheme(TEST ? 1 : 1 - Math.exp(-dt * 4));
-    var alt = 0;
-    if (XP && fly) alt = placeFly(W, H) / VZ;
+    var alt;
+    if (fly) { stepFly(dt); alt = placeFly(W, H) / VZ; }
     else {
-      cam.E = lerp(cam.E, want.E, kc); cam.N = lerp(cam.N, want.N, kc);
-      cam.d = Math.exp(lerp(Math.log(cam.d), Math.log(want.d), kc));
-      cam.hd = angLerp(cam.hd, want.hd, kc); cam.p = lerp(cam.p, want.p, kc); cam.ox = lerp(cam.ox, want.ox, kc); cam.oy = lerp(cam.oy, want.oy, kc);
+      cam.E = lerp(cam.E, ex.E, kf); cam.N = lerp(cam.N, ex.N, kf);
+      cam.d = Math.exp(lerp(Math.log(cam.d), Math.log(ex.d), kf));
+      cam.hd = angLerp(cam.hd, ex.hd, kf); cam.p = lerp(cam.p, ex.p, kf); cam.ox = lerp(cam.ox, off.ox, ko); cam.oy = lerp(cam.oy, off.oy, ko);
       placeCamera(cam, W, H);
       alt = camera.position.y / VZ + H0 - groundAt(camera.position.x + EC, NC - camera.position.z);
+      // Übergabe an den freien Flug erst, wenn die Kamera am Ziel des Anflugs steht
+      if (pendingFly && !flight && Math.abs(Math.log(cam.d / ex.d)) < 0.02 && Math.abs(cam.p - ex.p) < 0.6 && Math.hypot(cam.E - ex.E, cam.N - ex.N) < ex.d * 0.01) enterFly();
     }
-    var skyA = lerp(skyMat.uniforms.uA.value, XP ? 1 : 0, TEST ? 1 : 1 - Math.exp(-dt * 3));
+    // Himmel: im Flug immer, sonst nur nah und flach geneigt
+    var skyW = fly ? 1 : sstep(70000, 25000, cam.d) * sstep(58, 30, cam.p);
+    var skyA = lerp(skyMat.uniforms.uA.value, skyW, TEST ? 1 : 1 - Math.exp(-dt * 3));
     skyMat.uniforms.uA.value = skyA; sky.visible = skyA > 0.01; sky.position.copy(camera.position);
     sky.scale.setScalar(camera.far * 0.9 / 1000);
-    camera.updateMatrixWorld();
     var nowS = now / 1000;
 
-    // Parameter je Kapitel
-    var pa = PAR[keyA] || PAR.explore, pb = PAR[keyB] || PAR.explore;
-    ['focus', 'cont', 'cant'].forEach(function (k) { cur[k] = lerp(cur[k], lerp(pa[k], pb[k], tb), kf); });
+    var home = MODE === 'home' && !touring;
+    var tg = fly ? { focus: 1, cont: 0.6, cant: 1 } : home ? { focus: 0.6, cont: 0.45, cant: 0.6 } : touring ? { focus: 1, cont: 0.8, cant: 0.95 } : { focus: 1, cont: 0.7, cant: MODE === 'kantone' ? 1 : 0.85 };
+    ['focus', 'cont', 'cant'].forEach(function (k) { cur[k] = lerp(cur[k], tg[k], ko); });
     var hiTarget = new Array(NK).fill(0);
-    (HI[keyA] || []).forEach(function (c) { hiTarget[BYCODE[c].id] += 1 - tb; });
-    (HI[keyB] || []).forEach(function (c) { hiTarget[BYCODE[c].id] += tb; });
-    var finW = XP ? 1 : (keyA === 'kantone' ? 1 - tb : 0) + (keyB === 'kantone' ? tb : 0);
-    if (selected) hiTarget[selected.id] = Math.max(hiTarget[selected.id], finW);
-    for (var i = 0; i < NK; i++) hiCur[i] = lerp(hiCur[i], hiTarget[i], kf);
+    if (touring) TOUR[tourI].hi.forEach(function (c) { hiTarget[BYCODE[c].id] = 1; });
+    else if (selected && !fly) hiTarget[selected.id] = 1;
+    for (var i = 0; i < NK; i++) hiCur[i] = lerp(hiCur[i], hiTarget[i], ko);
     var TU = terrainMat.uniforms;
     TU.uFocus.value = cur.focus; TU.uContourA.value = cur.cont; TU.uHiv.value = hiCur; TU.uHiAny.value = Math.min(1, Math.max.apply(null, hiCur));
     var intro = (reduce || TEST) ? 1 : sstep(0, 1, (now - tReady) / 2600);
@@ -1137,79 +1686,100 @@ function start() {
     if (R.nation) { R.nation.material.uniforms.uDraw.value = ready ? intro : 0; R.nation.material.uniforms.uOpacity.value = LV.borders; R.nation.visible = LV.borders > 0.01; }
     if (R.cant) { R.cant.material.uniforms.uOpacity.value = 0.75 * Math.max(cur.cant, 0) * intro * LV.borders; R.cant.visible = LV.borders > 0.01; }
     if (R.rivers) { R.rivers.material.uniforms.uOpacity.value = 0.75 * LV.water; R.shore.material.uniforms.uOpacity.value = 0.55 * LV.water; R.rivers.visible = R.shore.visible = LV.water > 0.01; }
-    var routeA = LV.trails * (1 - sstep(140000, 260000, cam.d));
-    if (R.routesNat) { R.routesNat.material.uniforms.uOpacity.value = 0.9 * routeA; R.routesNat.visible = routeA > 0.01; }
-    if (R.routesReg) { var ra = routeA * (1 - sstep(60000, 110000, cam.d)); R.routesReg.material.uniforms.uOpacity.value = 0.75 * ra; R.routesReg.visible = ra > 0.01; }
-    POICAT.forEach(function (c, ci) { poiOn[ci] = lerp(poiOn[ci], LAYERS[c.k] ? 1 : 0, kl); });
-    poiMat.uniforms.uPR.value = renderer.getPixelRatio();
-    if (tapTip && now > tapTip) { tapTip = 0; poiMat.uniforms.uHot.value = -1; tip.classList.remove('on'); }
+    var wand = MODE === 'wandern' && !touring;
+    var routeA = LV.trails * (wand ? 1 : 1 - sstep(140000, 260000, cam.d)) * (touring ? 0 : 1);
+    var selR = SEL && SEL.kind === 'route' ? 0.35 : 1;
+    if (R.routesNat) { R.routesNat.material.uniforms.uOpacity.value = 0.9 * routeA * selR; R.routesNat.visible = routeA > 0.01; }
+    if (R.routesReg) { var ra = routeA * (wand ? 1 - sstep(300000, 520000, cam.d) : 1 - sstep(60000, 110000, cam.d)); R.routesReg.material.uniforms.uOpacity.value = 0.75 * ra * selR; R.routesReg.visible = ra > 0.01; }
+    Object.keys(ROUTESEL).forEach(function (k) {
+      var m = ROUTESEL[k], on = m === routeSel ? 1 : 0;
+      m.userData.o = lerp(m.userData.o, on, kl);
+      m.userData.draw = on ? Math.min(1, m.userData.draw + dt * (reduce || TEST ? 99 : 0.55)) : m.userData.draw;
+      m.material.uniforms.uOpacity.value = m.userData.o; m.material.uniforms.uDraw.value = m.userData.draw * 1.001;
+      m.visible = m.userData.o > 0.01;
+    });
+    var hotCat = hotPOI >= 0 && POIS[hotPOI] ? POIS[hotPOI].c : -1;
+    POICAT.forEach(function (c, ci) { poiOn[ci] = lerp(poiOn[ci], !touring && (LAYERS[c.k] || ci === hotCat) ? 1 : 0, kl); });
+    poiMat.uniforms.uPR.value = renderer.getPixelRatio() * (small ? 0.9 : 1);
+    if (tapTip && now > tapTip) { tapTip = 0; tip.classList.remove('on'); }
     labelsEl.style.visibility = LAYERS.labels ? '' : 'hidden';
     var dk = U.uDark.value > 0.5; hemi.intensity = dk ? 0.62 : 1.1; sun.intensity = dk ? 0.9 : 1.6;
     if (window.SFModels && window.SFModels.setLift && dk !== frame.dk) { window.SFModels.setLift(dk ? 0.2 : 0.35); frame.dk = dk; }
     if (detail) {
-      var fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-      detail.update({ E: cam.E, N: cam.N, cE: camera.position.x + EC, cN: NC - camera.position.z, cH: Math.max(0, alt), D: XP && fly ? alt * 1.6 + 1500 : Math.min(cam.d, alt * 1.4 + cam.d * 0.3), frustum: fr }, dt, now);
+      frustum.setFromProjectionMatrix(pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      detail.update({ E: cam.E, N: cam.N, cE: camera.position.x + EC, cN: NC - camera.position.z, cH: Math.max(0, alt), D: fly ? alt * 1.6 + 1500 : Math.min(cam.d, alt * 1.4 + cam.d * 0.3), frustum: frustum }, dt, now);
     }
     updateModels(nowS, dt, H);
     // Umriss des gewählten Kantons
+    var ringOn = selected && !touring && !fly ? selected.code : null;
+    if (ringOn) ringFor(ringOn);
     Object.keys(RING).forEach(function (code) {
-      var m = RING[code], on = selected && selected.code === code ? 1 : 0;
-      m.userData.o = lerp(m.userData.o, on * Math.max(finW, 0.35) * LV.borders, kf);
+      var m = RING[code], on = code === ringOn ? 1 : 0;
+      m.userData.o = lerp(m.userData.o, on * LV.borders, ko);
       m.userData.draw = on ? Math.min(1, m.userData.draw + dt * (reduce || TEST ? 99 : 0.7)) : 0;
       m.material.uniforms.uOpacity.value = m.userData.o; m.material.uniforms.uDraw.value = m.userData.draw * 1.001;
       m.visible = m.userData.o > 0.01;
     });
-    if (selected) ringFor(selected.code);
 
-    // Hover
-    if ((ptr.moved || drag.on || (ptr.over && HUDtick % 4 === 0)) && !tapTip) {
+    // Zeiger über der Karte
+    if ((ptr.moved || (ptr.over && HUDtick % 4 === 0)) && !tapTip) {
       ptr.moved = false;
-      var ph = (ready && ptr.over && fine && !(gesture && XP) && !document.pointerLockElement) ? poiAt(ptr.cx, ptr.cy, W, H) : null;
-      poiMat.uniforms.uHot.value = ph ? ph.i : -1;
-      var hit = (ready && ptr.over && fine && !ph && !(XP && fly) && !document.pointerLockElement) ? pick(ptr.cx, ptr.cy) : null;
-      if (ph) { showPoiTip(ph); document.body.style.cursor = 'pointer'; hit = null; }
+      var can = ready && ptr.over && fine && !drag.mode && !fly && !pendingFly;
+      var ph = can ? poiAt(ptr.cx, ptr.cy, W, H) : null;
+      if (hotPOI < 0) poiMat.uniforms.uHot.value = ph ? ph.i : -1;
+      var mo = can && !ph ? modelAt(ptr.cx, ptr.cy, W, H) : null;
+      var hit = can && !ph && !mo ? pick(ptr.cx, ptr.cy) : null;
       hoverId = hit ? idAt(hit.E, hit.N) : 0;
-      TU.uHover.value = hoverId > 0 ? hoverId : -1;
-      if (hit && hoverId > 0 && !drag.on) {
+      TU.uHover.value = hoverId > 0 && !touring ? hoverId : -1;
+      if (ph) { showPoiTip(ph); placeTip(ptr.cx, ptr.cy); body.style.cursor = 'pointer'; }
+      else if (mo) {
+        tipT.innerHTML = '<img src="' + wappen(mo.code) + '" alt="">' + esc(mo.m.name);
+        tipA.textContent = mo.m.text; tipB.textContent = 'Kanton ' + KC[mo.code].name + ' · Klick für Details';
+        placeTip(ptr.cx, ptr.cy); body.style.cursor = 'pointer';
+      } else if (hit && hoverId > 0) {
         var c = BYID[hoverId];
         tipT.innerHTML = '<img src="' + wappen(c.code) + '" alt="">' + esc(KC[c.code].name);
         tipA.textContent = km2(c.ha) + ' km² · ' + swiss(c.pop) + ' Einw.';
-        tipB.textContent = 'Hier ' + Math.round(hit.h) + ' m · ' + swiss(hit.E) + ' / ' + swiss(hit.N);
-        var tx = ptr.cx + 18, ty = ptr.cy + 18;
-        if (tx > W - 240) tx = ptr.cx - 240; if (ty > window.innerHeight - 90) ty = ptr.cy - 90;
-        tip.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
-        tip.classList.add('on');
-        document.body.style.cursor = inFinale() ? 'pointer' : '';
-      } else if (!ph) { tip.classList.remove('on'); if (!drag.on) document.body.style.cursor = ''; }
+        tipB.textContent = 'Hier ' + swiss(hit.h) + ' m ü. M.';
+        placeTip(ptr.cx, ptr.cy); body.style.cursor = 'pointer';
+      } else { tip.classList.remove('on'); if (!drag.mode) body.style.cursor = ''; }
     }
 
-    // Beschriftungen: Sichtbarkeit, Verdeckung, Kollision nach Rang
-    var wA = 1 - tb, wB = tb, placed = [], selCode = selected ? selected.code : null;
+    // Beschriftungen: Sichtbarkeit nach Abstand, Verdeckung, Kollision nach Rang
+    var placed = [], selCode = selected ? selected.code : null, dT = cam.d, hotId = HOT ? HOT.id : null;
+    var tourHi = touring ? TOUR[tourI].hi : null;
     for (i = 0; i < LBL.length; i++) {
       var L = LBL[i], want_o = 0;
-      if (XP) {
+      if (fly) {
         var ldx = L.p.x - camera.position.x, ldz = L.p.z - camera.position.z, ld = Math.sqrt(ldx * ldx + ldz * ldz);
         if (L.kind === 'canton') want_o = sstep(9000, 26000, alt) * (1 - sstep(220000, 320000, ld));
         else if (L.kind === 'lake') want_o = 1 - sstep(90000, 160000, ld);
         else if (L.kind === 'peak') want_o = 1 - sstep(70000, 130000, ld);
-        else want_o = (1 - sstep(45000, 70000, ld)) * (LAYERS.marks ? 1 : 0.85);
+        else want_o = (1 - sstep(45000, 70000, ld)) * (LAYERS.marks ? 1 : 0);
       } else {
-      if (L.s.indexOf(keyA) >= 0) want_o += wA;
-      if (L.s.indexOf(keyB) >= 0) want_o += wB;
+        var gd = Math.hypot(L.E - cam.E, L.N - cam.N) / dT;
+        if (L.kind === 'canton') {
+          want_o = sstep(30000, 60000, dT);
+          if (tourHi) want_o *= tourHi.length && tourHi.indexOf(L.code) < 0 ? 0.0 : 1;
+          if (L.code === selCode && dT > 20000) want_o = Math.max(want_o, 1);
+        } else if (L.kind === 'lake') want_o = (L.big ? 1 - sstep(380000, 560000, dT) : 1 - sstep(130000, 200000, dT)) * (1 - sstep(0.9, 1.3, gd));
+        else if (L.kind === 'peak') want_o = (L.big ? 1 - sstep(300000, 460000, dT) : 1 - sstep(90000, 150000, dT)) * (1 - sstep(0.8, 1.2, gd)) * sstep(1500, 4000, dT);
+        else {
+          var near = (1 - sstep(70000, 110000, dT)) * (1 - sstep(0.9, 1.4, gd));
+          if (L.code === selCode && (MODE === 'wahrzeichen' || MODE === 'kantone')) near = Math.max(near, 1 - sstep(300000, 420000, dT));
+          if (L.mark.id === hotId) near = 1;
+          want_o = LAYERS.marks && !touring ? near : 0;
+        }
       }
-      if (XP) { /* im Erkunden-Modus zählt nur die Nähe */ }
-      else if (L.code && L.code === selCode) {
-        if (L.kind === 'poi' || L.kind === 'canton') want_o = Math.max(want_o, finW);
-      } else if (L.kind === 'poi' && selCode) want_o *= 1 - finW;
-      if (L.kind === 'poi') { var isOn = L.code === selCode && L.mi === selMark; if (isOn !== L.on) { L.on = isOn; L.el.classList.toggle('on', isOn); L.bw = 0; } }
-      want_o = sstep(0.35, 0.85, want_o);
+      if (L.kind === 'poi') { var isOn = L.mark.id === hotId; if (isOn !== L.on) { L.on = isOn; L.el.classList.toggle('on', isOn); L.bw = 0; } }
+      want_o = sstep(0.3, 0.8, want_o);
       if (!ready) want_o = 0;
       tmpV.copy(L.p).project(camera);
       var vis = tmpV.z < 1 && Math.abs(tmpV.x) < 1.08 && Math.abs(tmpV.y) < 1.08;
       if (want_o > 0.01 && vis && (HUDtick + L.n) % 5 === 0) {
         L.occ = false;
         for (var s = 1; s <= 9; s++) {
-          var f = s / 10 * 0.7, px = lerp(L.p.x, camera.position.x, f), py = lerp(L.p.y, camera.position.y, f), pz = lerp(L.p.z, camera.position.z, f);
+          var f = s / 10 * 0.92, px = lerp(L.p.x, camera.position.x, f), py = lerp(L.p.y, camera.position.y, f), pz = lerp(L.p.z, camera.position.z, f);
           var E = px + EC, N = NC - pz;
           if (inGrid(E, N) && Y(groundAt(E, N)) > py + 10) { L.occ = true; break; }
         }
@@ -1222,46 +1792,54 @@ function start() {
       if (L.want > 0.01) {
         if (!L.bw) { L.el.style.opacity = '0'; L.el.style.transform = 'translate3d(-9999px,0,0)'; L.bw = L.el.offsetWidth; L.bh = L.el.offsetHeight; }
         var left = (L.kind === 'peak' || L.kind === 'poi') ? L.sx - 5 : L.sx - L.bw / 2, tries = L.kind === 'canton' ? [0, -15, 15] : [0], ok = false;
+        if (L.kind === 'poi' && L.on) tries = [0];
         for (var tr = 0; tr < tries.length && !ok; tr++) {
           var top = L.sy - L.bh / 2 + tries[tr], hitL = false;
           for (var q = 0; q < placed.length; q++) { var P = placed[q]; if (left < P[2] + 6 && left + L.bw + 6 > P[0] && top < P[3] + 2 && top + L.bh + 2 > P[1]) { hitL = true; break; } }
-          if (!hitL) { ok = true; L.dy = lerp(L.dy || 0, tries[tr], TEST ? 1 : 1 - Math.exp(-dt * 8)); placed.push([left, top, left + L.bw, top + L.bh]); }
+          if (!hitL || L.on) { ok = true; L.dy = lerp(L.dy || 0, tries[tr], TEST ? 1 : 1 - Math.exp(-dt * 8)); placed.push([left, top, left + L.bw, top + L.bh]); }
         }
         if (!ok) L.want = 0;
       }
       L.o = TEST ? L.want : lerp(L.o, L.want, 1 - Math.exp(-dt * 6));
+      var clickable = L.kind === 'poi' && L.o > 0.5 && !fly;
+      if (clickable !== L.hit) { L.hit = clickable; L.el.classList.toggle('hit', clickable); }
       if (L.o < 0.01) { if (L.w !== 0) { L.el.style.opacity = '0'; L.w = 0; } continue; }
-      var off = (L.kind === 'peak' || L.kind === 'poi') ? 'translate(-5px,-50%)' : 'translate(-50%,-50%)';
-      L.el.style.transform = 'translate3d(' + L.sx.toFixed(1) + 'px,' + (L.sy + (L.dy || 0)).toFixed(1) + 'px,0) ' + off;
+      var offT = (L.kind === 'peak' || L.kind === 'poi') ? 'translate(-5px,-50%)' : 'translate(-50%,-50%)';
+      L.el.style.transform = 'translate3d(' + L.sx.toFixed(1) + 'px,' + (L.sy + (L.dy || 0)).toFixed(1) + 'px,0) ' + offT;
       L.el.style.opacity = L.o.toFixed(3); L.w = 1;
     }
 
-    // HUD, Fortschritt, Navigation
+    // Liste der Orte in der Nähe nachführen, wenn die Karte ruht
+    if (MODE === 'familien' && !SEL && !selected && listCenter && !drag.mode && !flight && !fly && now - lastListT > 700 &&
+        (Math.hypot(ex.E - listCenter.E, ex.N - listCenter.N) > listCenter.d * 0.18 || Math.abs(Math.log(ex.d / listCenter.d)) > 0.35)) renderList();
+
+    // HUD
     HUDtick++;
     if (ready && HUDtick % 4 === 0) {
-      if (XP && fly) {
-        var fE = fly.x + EC, fN = NC - fly.z, fid = idAt(fE, fN), v = fly.v.length() / 1;
+      var st = detail ? detail.stats() : null;
+      if (fly) {
+        var fE = fly.x + EC, fN = NC - fly.z, fid = idAt(fE, fN), v = Math.hypot(fly.v.x, fly.v.z, fly.v.y / VZ);
         hudA.textContent = swiss(fly.y / VZ + H0) + ' m ü. M. · ' + swiss(alt) + ' m über Grund';
         hudB.textContent = (fid ? KC[BYID[fid].code].name + ' · ' : '') + swiss(v * 3.6) + ' km/h · Tempo ×' + dec(flyMul, 1);
       } else {
         var hh = groundAt(cam.E, cam.N), id = idAt(cam.E, cam.N);
         hudA.textContent = swiss(cam.E) + ' / ' + swiss(cam.N);
-        hudB.textContent = (id ? KC[BYID[id].code].name + ' · ' : '') + Math.round(hh) + ' m ü. M.' + (detail && LAYERS.sat && detail.stats().tiles ? ' · Luftbild' : '');
+        hudB.textContent = (id ? KC[BYID[id].code].name + ' · ' : '') + swiss(hh) + ' m ü. M.' + (st && LAYERS.sat && st.tiles ? ' · Luftbild' : '');
       }
+      attribEl.classList.toggle('on', !!(st && st.tiles && (LAYERS.sat || LAYERS.trails)));
     }
     north.style.transform = 'rotate(' + (-cam.hd).toFixed(1) + 'deg)';
-    var pr = clamp(window.scrollY / Math.max(1, docH - window.innerHeight), 0, 1);
-    prog.style.transform = 'scaleX(' + pr.toFixed(4) + ')';
-    mark.classList.toggle('on', window.scrollY > window.innerHeight * 0.55);
-    var active = XP ? '' : st.t < 0.5 ? keyA : keyB;
-    for (i = 0; i < navLinks.length; i++) navLinks[i].classList.toggle('on', navLinks[i].dataset.for === active);
 
     renderer.render(scene, camera);
     if (!TEST) requestAnimationFrame(frame);
   }
-  if (TEST) { window.__frame = function () { frame(performance.now()); return true; }; window.__R = R; window.__RING = RING;
-    window.__dbg = { cam: function () { return cam; }, detail: function () { return detail && detail.stats(); }, models: function () { return MODELS.length; }, poi: function () { return POI && POI.list.length; },
-      orbit: function (o) { Object.keys(o).forEach(function (k) { orbit[k] = o[k]; }); }, fly: function (o) { if (fly) Object.keys(o).forEach(function (k) { fly[k] = o[k]; }); return fly; } }; }
+  if (TEST) {
+    window.__frame = function () { frame(performance.now()); return true; }; window.__R = R; window.__RING = RING;
+    window.__dbg = { cam: function () { return cam; }, ex: function () { return ex; }, detail: function () { return detail && detail.stats(); }, models: function () { return MODELS.length; }, poi: function () { return POI && POI.list.length; },
+      set: function (o) { flight = null; Object.keys(o).forEach(function (k) { ex[k] = o[k]; if (cam) cam[k] = o[k]; }); },
+      fly: function (o) { if (fly) Object.keys(o).forEach(function (k) { fly[k] = o[k]; }); return fly; }, flying: function () { return !!fly; }, pending: function () { return pendingFly; },
+      click: function (x, y) { mapClick(x, y, 'mouse'); } };
+  }
 
   /* ---------------- Start ---------------- */
   (async function boot() {
@@ -1306,33 +1884,16 @@ function start() {
       R.nation = buildRibbon(toLines(Ls.nation), ribbonMat('--m-nation', small ? 2.6 : 3.2, 1), true);
       R.shore.renderOrder = 1; R.rivers.renderOrder = 2; R.cant.renderOrder = 3; R.nation.renderOrder = 4;
 
-      D.cantons.forEach(function (c) {
-        var secs = ['schweiz', 'kantone'], reg = regionOf(c.code); if (reg) secs.push(reg);
-        addLabel(KC[c.code].name, 'canton', c.at[0], c.at[1], secs, null, null, { code: c.code });
-      });
+      D.cantons.forEach(function (c) { addLabel(KC[c.code].name, 'canton', c.at[0], c.at[1], { code: c.code }); });
       var PL = D.places || {};
-      (PL.lakes || []).forEach(function (l) {
-        var secs = l.big ? ['schweiz', 'kantone'] : [];
-        (l.regions || []).forEach(function (r) { secs.push(r); });
-        addLabel(l.name, 'lake', l.E, l.N, secs);
-      });
-      (PL.peaks || []).forEach(function (pk) {
-        var secs = pk.big ? ['schweiz'] : []; (pk.regions || []).forEach(function (r) { secs.push(r); });
-        addLabel(pk.name, 'peak', pk.E, pk.N, secs, null, swiss(pk.h));
-      });
-      Object.keys(MARKS).forEach(function (code) {
-        MARKS[code].forEach(function (m, mi) {
-          addLabel(m.name, 'poi', m.E, m.N, [regionOf(code)], null, null, { code: code, mi: mi });
-        });
-      });
+      (PL.lakes || []).forEach(function (l) { addLabel(l.name, 'lake', l.E, l.N, { big: !!l.big }); });
+      (PL.peaks || []).forEach(function (pk) { addLabel(pk.name, 'peak', pk.E, pk.N, { big: !!pk.big, elev: swiss(pk.h) }); });
+      MARKLIST.forEach(function (m) { addLabel(m.name, 'poi', m.E, m.N, { code: m.code, mark: m }); });
       LBL_ORDER = LBL.slice().sort(function (a, b) { return PRIO[a.kind] - PRIO[b.kind] || a.n - b.n; });
-      LBL.forEach(function (L) { L.el.__L = L; });
-      poiP.then(buildPOI).catch(function (e) { console.warn('Punkte', e); });
-      routesP.then(buildRoutes).catch(function (e) { console.warn('Routen', e); });
       buildModels();
-      onLayer = function (k, v) { if (detail && (k === 'sat' || k === 'trails')) detail.set(k, v); };
 
       ready = true; tReady = performance.now();
+      buildPOI(); buildRoutes();
       canvas.style.opacity = '1';
       statusEl.textContent = '';
       hudA.textContent = '';
@@ -1340,7 +1901,7 @@ function start() {
       if (!TEST) requestAnimationFrame(frame);
     } catch (err) {
       console.error(err);
-      fail('Das Relief konnte nicht aufgebaut werden. Die Texte bleiben lesbar.');
+      fail('Das Relief konnte nicht aufgebaut werden.');
     }
   })();
 }

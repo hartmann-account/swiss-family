@@ -2,12 +2,13 @@
 
 „Schweizer Familien“: Relief der ganzen Schweiz mit allen 26 Kantonen, ihren Wappen, Farben und Wahrzeichen. Statische Seite, ausgeliefert über Cloudflare Workers (Static Assets), aufgebaut wie [zug-family](https://github.com/hartmann-account/zug-family).
 
-Wer einen Kanton wählt (Kachel, Klick ins Relief oder Link wie `/#zh`), bekommt die Seite in den Farben dieses Kantons: Band, Akzente, Kantonsumriss und Modellsockel wechseln, die Kamera fliegt hin, die Wahrzeichen erscheinen im Relief.
+Die Oberfläche folgt dem App-Aufbau von zug-family: Das Relief füllt das Fenster, oben eine Leiste mit den Bereichen **Kantone**, **Wahrzeichen**, **Familien** und **Wandern** (auf dem Handy als Tab-Leiste unten), dazu eine Startansicht mit Einstiegskarten und ein Panel je Bereich, auf dem Desktop links, auf dem Handy als Blatt mit drei Höhen. Adressen wie `#/kantone/zh`, `#/wahrzeichen/be-1`, `#/familien?k=gr` oder `#/wandern/3` führen direkt zu Liste oder Detail; alte Links wie `/#zh` werden umgeleitet.
 
-**Karte erkunden** schaltet die Scroll-Erzählung ab und gibt die Kamera frei:
+Wer einen Kanton wählt (Liste, Wappenleiste, Klick ins Relief), bekommt die Seite in den Farben dieses Kantons; die Auswahl gilt auch als Filter in den anderen Bereichen. Der Rundflug führt über die sieben Grossregionen.
 
-- *Umkreisen*: Ziehen dreht 360°, rechte Maustaste oder Shift verschiebt, Mausrad zoomt, Doppelklick setzt den Blickpunkt. Tastatur: W A S D, Q/E drehen, R/F zoomen.
-- *Frei fliegen*: Klick fängt die Maus (Pointer Lock), Blick 360° mit der Maus, W A S D fliegen, E/Leertaste hoch, Q/C runter, Shift schneller, Mausrad ändert das Tempo, Esc gibt die Maus frei. Auf Touch-Geräten: linker Daumen fliegt, rechter blickt, Knöpfe für hoch/runter.
+Bedienung der Karte wie bei zug-family: Ziehen verschiebt, rechte Maustaste oder zwei Finger drehen und neigen, Mausrad oder zwei Finger zoomen, Pfeiltasten, Q/E und Bild auf/ab per Tastatur.
+
+**Frei fliegen** (Knopf rechts oder im Detail): Die Kamera fliegt zuerst tief, dann übernimmt die Steuerung. Klick fängt die Maus (Pointer Lock), Blick 360° mit der Maus, W A S D fliegen, E/Leertaste hoch, Q/C runter, Shift schneller, Mausrad ändert das Tempo, Esc gibt die Maus frei, „Landen“ kehrt zur Karte zurück. Auf Touch-Geräten: linker Daumen fliegt, rechter blickt, Knöpfe für hoch und runter.
 
 Beim Heranzoomen lädt die Seite 40-m-Höhenkacheln und legt das Luftbild SWISSIMAGE und das Wanderwegnetz live aus dem WMTS von swisstopo darüber. Die **Ebenen**-Legende blendet Luftbild, Wanderwege, 3D-Wahrzeichen, Grenzen, Gewässer, Namen und die Punktebenen ein und aus: Bahnhöfe, Bergbahnen, Spielplätze, Badis, Zoos und Tierparks, Museen, Feuerstellen, Campingplätze, Aussichtspunkte und Spitäler.
 
@@ -21,7 +22,7 @@ npm run deploy   # nach Cloudflare deployen
 
 - `public/index.html`: Seite und Stil
 - `public/kantone.js`: Kantone mit Namen, Hauptort, Beitritt, Sprachen, Farben und Wahrzeichen-Texten
-- `public/app.js`: Relief (three.js), Kamerafahrt, Beschriftungen, Kantonswahl, Ebenen, Erkunden-Modus
+- `public/app.js`: Adressen und Panels je Bereich, Kantonswahl, Ebenen, Rundflug; Relief (three.js), Kamera und Gesten, Beschriftungen, freier Flug
 - `public/detail.js`: Nahansicht mit Höhenkacheln, Luftbild und Wanderwegen
 - `public/models.js`: 3D-Wahrzeichen (prozedurale, animierte Modelle)
 - `public/data/`: Höhenraster, Schummerung, Kantonsmaske, Linien und Orte (aus `tools/build_data.py`), Wappen
