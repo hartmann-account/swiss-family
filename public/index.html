@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Schweizer Familien</title>
+<meta name="description" content="Ein Relief der Schweiz aus den Höhendaten von swisstopo: alle 26 Kantone mit Wappen, Farben und Wahrzeichen.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='3' fill='%23D52B1E'/%3E%3Cpath d='M13 6h6v7h7v6h-7v7h-6v-7H6v-6h7z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:ital,wght@0,400;0,600;1,400;1,600&display=swap">
+<link rel="preload" href="data/geo.json" as="fetch" crossorigin>
+<style>
+/* Layout: das Relief liegt fix hinter der Seite, eine Lesespalte (Desktop links, Telefon unten).
+   Die Markenfarben (--brand …) wechseln mit dem gewählten Kanton, siehe data-kanton auf <html>. */
+:root{
+  color-scheme:light;
+  --paper:#F6F7F9; --ink:#161A22; --ink-2:#4D5565; --mist:#E6E9EE; --rule:rgba(22,26,34,.14);
+  --card:rgba(255,255,255,.9); --halo:rgba(255,255,255,.92); --shadow:rgba(22,26,34,.18);
+  --lake-text:#155E95; --lake-label:#FFFFFF; --lake-halo:rgba(0,40,80,.55);
+  --brand:#D52B1E; --brand-text:#B3241A; --on-brand:#FFFFFF; --flag:linear-gradient(90deg,#D52B1E 0 100%);
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  /* Relief */
+  --m-land:#EEF0F2; --m-lit:#FFFFFF; --m-shade:#6E7584; --m-forest:#E1E7E1; --m-out:#F2F3F5;
+  --m-water:#3A8DCB; --m-water-deep:#0C4C85; --m-contour:#556074; --m-hi:#D52B1E;
+  --m-side:#D52B1E; --m-side-2:#7E1710; --m-line:#D52B1E; --m-nation:#D52B1E; --m-cant:#3A4252;
+  --m-river:#2F86C9; --m-shore:#1F6EAD;
+  --m-dark:0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --paper:#0A0D13; --ink:#E8ECF2; --ink-2:#A6AFBE; --mist:#151A24; --rule:rgba(232,236,242,.16);
+    --card:rgba(14,18,26,.88); --halo:rgba(10,13,19,.9); --shadow:rgba(0,0,0,.5);
+    --lake-text:#8CC6F0; --lake-label:#AFDBFF; --lake-halo:rgba(2,12,26,.8);
+    --brand-text:#FF7B70;
+    --m-land:#1E2430; --m-lit:#404B5E; --m-shade:#05070B; --m-forest:#C3CAD4; --m-out:#10141C;
+    --m-water:#114F8E; --m-water-deep:#062851; --m-contour:#8FA3C2; --m-hi:#FF5A4C;
+    --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8;
+    --m-dark:1;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#0A0D13; --ink:#E8ECF2; --ink-2:#A6AFBE; --mist:#151A24; --rule:rgba(232,236,242,.16);
+  --card:rgba(14,18,26,.88); --halo:rgba(10,13,19,.9); --shadow:rgba(0,0,0,.5);
+  --lake-text:#8CC6F0; --lake-label:#AFDBFF; --lake-halo:rgba(2,12,26,.8);
+  --brand-text:#FF7B70;
+  --m-land:#1E2430; --m-lit:#404B5E; --m-shade:#05070B; --m-forest:#C3CAD4; --m-out:#10141C;
+  --m-water:#114F8E; --m-water-deep:#062851; --m-contour:#8FA3C2; --m-hi:#FF5A4C;
+  --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8;
+  --m-dark:1;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden;transition:background-color .6s}
+img{max-width:100%}
+[hidden]{display:none!important}
+#scene{position:fixed;left:0;top:0;width:100%;height:100vh;height:100lvh;display:block;z-index:0;outline:none}
+#labels{position:fixed;left:0;top:0;width:100%;height:100vh;height:100lvh;z-index:1;pointer-events:none;overflow:hidden}
+main{position:relative;z-index:2;pointer-events:none}
+main a, main button, .card{pointer-events:auto}
+.wrap{padding-inline:max(16px, 5vw)}
+
+/* ---------- Fortschrittsband, Wortmarke, Kantonswahl */
+.progress{position:fixed;left:0;right:0;top:0;height:calc(3px + env(safe-area-inset-top,0px));z-index:6;pointer-events:none}
+.progress span{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--brand);transform-origin:0 50%;transform:scaleX(0);transition:background-color .6s}
+.mark{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:max(16px,5vw);z-index:5;display:flex;align-items:center;gap:9px;
+  font-family:var(--f-display);font-variation-settings:"wdth" 118;font-weight:700;font-size:13px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink);opacity:0;transform:translateY(-6px);transition:opacity .4s, transform .4s;pointer-events:none;
+  text-shadow:0 0 6px var(--halo)}
+.mark.on{opacity:1;transform:none}
+.mark i{font-style:normal;color:var(--brand-text);transition:color .6s}
+.mark img{width:16px;height:19px;object-fit:contain}
+.pick{position:fixed;top:calc(9px + env(safe-area-inset-top,0px));right:max(16px,2.4vw);z-index:6;pointer-events:auto;
+  display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:1px solid var(--rule);background:var(--card);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink);text-decoration:none;
+  font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+.pick img{width:18px;height:22px;object-fit:contain}
+.pick:hover{border-color:var(--brand)}
+.pick:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ---------- Kapitelindex (Desktop) */
+.nav{position:fixed;right:max(16px,2.4vw);top:50%;transform:translateY(-50%);z-index:5;display:none;flex-direction:column;gap:2px;pointer-events:auto}
+.nav a{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:5px 0;color:var(--ink-2);text-decoration:none;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.nav a span{opacity:0;transform:translateX(6px);transition:opacity .25s, transform .25s;text-shadow:0 0 6px var(--halo)}
+.nav a::after{content:"";width:14px;height:2px;background:currentColor;opacity:.45;transition:width .25s, opacity .25s, background .25s}
+.nav:hover a span, .nav a.on span, .nav a:focus-visible span{opacity:1;transform:none}
+.nav a.on{color:var(--brand-text)}
+.nav a.on::after{width:28px;opacity:1;background:var(--brand)}
+.nav a:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+@media (min-width:1100px){ .nav{display:flex} }
+
+/* ---------- HUD: LV95 und Nordpfeil */
+.hud{position:fixed;right:max(16px,2.4vw);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;gap:12px;
+  font-family:var(--f-mono);font-size:11.5px;line-height:1.45;color:var(--ink-2);font-variant-numeric:tabular-nums;pointer-events:none;
+  text-shadow:0 0 6px var(--halo), 0 0 2px var(--halo)}
+.hud svg{width:34px;height:34px;flex:none}
+.hud #hudA{font-weight:500;color:var(--ink)}
+.hud .st{display:block}
+@media (max-width:640px){
+  .hud{left:16px;right:auto;top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;font-size:10.5px} .hud svg{width:26px;height:26px}
+  .mark{display:none} .pick span{display:none} .pick{padding:6px}
+}
+
+/* ---------- Einstieg */
+.hero{position:relative;min-height:100svh;display:grid;grid-template-rows:1fr auto minmax(18vh,auto)}
+.band{grid-row:2;position:relative;background:var(--brand);color:var(--on-brand);padding-block:clamp(22px,4vh,40px);transition:background-color .6s,color .6s}
+.band::after{content:"";position:absolute;left:0;right:0;bottom:-8px;height:8px;background:var(--flag)}
+.band .wrap{display:grid;gap:10px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.92;display:flex;align-items:center;gap:10px}
+.eyebrow img{width:18px;height:22px;object-fit:contain}
+.hero h1{margin:0;font-family:var(--f-display);font-variation-settings:"wdth" 125;font-weight:700;
+  font-size:clamp(2.5rem, 8.6vw, 7.4rem);line-height:.92;letter-spacing:-.015em;text-wrap:balance}
+.under{grid-row:3;padding-block:30px 40px}
+.under .wrap{display:flex;flex-wrap:wrap;gap:18px 48px;align-items:flex-start;justify-content:space-between}
+.lead{margin:0;max-width:36rem;font-size:clamp(1.05rem,1.6vw,1.25rem);line-height:1.5;color:var(--ink);text-shadow:0 0 12px var(--halo)}
+.cue{display:flex;align-items:center;gap:12px;font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);padding-top:6px}
+.cue::before{content:"";width:1px;height:36px;background:linear-gradient(var(--brand),transparent);animation:cue 2.2s ease-in-out infinite}
+@keyframes cue{0%{transform:scaleY(.2);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}100%{transform:scaleY(.2);transform-origin:bottom}}
+@media (prefers-reduced-motion: reduce){ .cue::before{animation:none} }
+.status{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;color:var(--ink-2)}
+
+/* ---------- Kapitel */
+.chapter{min-height:150vh;display:flex;align-items:center}
+.chapter .wrap{width:100%}
+.card{width:min(26rem,100%);background:var(--card);
+  -webkit-backdrop-filter:blur(10px) saturate(1.15);backdrop-filter:blur(10px) saturate(1.15);
+  border-top:4px solid var(--brand);padding:22px 26px 22px;box-shadow:0 18px 40px -26px var(--shadow);transition:border-color .6s}
+.kicker{margin:0 0 10px;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-text);line-height:1.5;transition:color .6s}
+.card h2{margin:0 0 12px;font-family:var(--f-display);font-variation-settings:"wdth" 104;font-weight:680;font-size:clamp(1.55rem,2.6vw,2.15rem);
+  line-height:1.06;letter-spacing:-.01em;text-wrap:balance}
+.card p{margin:0 0 14px;color:var(--ink)}
+.card p.hint{color:var(--ink-2);font-size:15px}
+@media (hover:none){ .hint-hover{display:none} }
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(7.2rem,1fr));gap:12px 18px;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--rule)}
+.facts div{min-width:0}
+.facts dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.facts dd{margin:2px 0 0;font-family:var(--f-mono);font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.rows{list-style:none;margin:16px 0 0;padding:12px 0 0;border-top:1px solid var(--rule);display:grid;gap:4px;
+  font-family:var(--f-mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.rows li{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.rows li span:first-child{font-family:var(--f-body);font-size:15px;display:flex;align-items:center;gap:8px}
+.rows li img{width:14px;height:17px;object-fit:contain}
+.rows li span:last-child{color:var(--ink-2);text-align:right}
+
+/* ---------- Kantonswahl */
+.finale{min-height:130vh;display:flex;align-items:center}
+.finale .card{width:min(31rem,100%)}
+.tiles{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:14px 0 6px}
+.tiles button{appearance:none;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:7px 2px 5px;
+  border:1px solid var(--rule);background:transparent;color:var(--ink);cursor:pointer;
+  font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;transition:background .2s,border-color .2s,color .2s}
+.tiles button img{width:22px;height:27px;object-fit:contain;pointer-events:none}
+.tiles button:hover{border-color:var(--brand)}
+.tiles button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.tiles button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.tiles .all{grid-column:span 1}
+.tiles .all svg{width:22px;height:27px}
+.detail{margin-top:12px;padding-top:14px;border-top:1px solid var(--rule)}
+.dhead{display:flex;gap:14px;align-items:center}
+.dhead img{width:52px;height:63px;object-fit:contain;flex:none}
+.dhead h3{margin:0;font-family:var(--f-display);font-variation-settings:"wdth" 106;font-weight:700;font-size:1.45rem;line-height:1.08}
+.dhead p{margin:2px 0 0;font-size:14.5px;color:var(--ink-2)}
+.flagbar{height:6px;margin:12px 0 0;background:var(--flag)}
+.marks{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}
+.marks button{appearance:none;width:100%;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;text-align:left;
+  padding:8px 10px;border:1px solid var(--rule);background:transparent;color:var(--ink);cursor:pointer;font-family:var(--f-body);font-size:15px;
+  transition:background .2s,border-color .2s}
+.marks button::before{content:"";grid-row:span 2;width:8px;height:8px;border-radius:50%;background:var(--brand);margin-top:6px}
+.marks button b{font-weight:600}
+.marks button small{grid-column:2;font-size:13.5px;color:var(--ink-2);line-height:1.4}
+.marks button:hover{border-color:var(--brand)}
+.marks button[aria-pressed="true"]{border-color:var(--brand);background:color-mix(in srgb, var(--brand) 12%, transparent)}
+.marks button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.sel{margin:10px 0 0;font-size:15px;color:var(--ink-2)}
+.sel b{color:var(--ink);font-weight:600}
+
+/* ---------- Fuss */
+footer{position:relative;z-index:2;background:var(--paper);border-top:1px solid var(--rule)}
+footer .wrap{padding-block:34px 44px;display:grid;gap:10px;max-width:72rem}
+footer p{margin:0;font-size:14.5px;color:var(--ink-2);max-width:66ch}
+footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+
+/* ---------- Beschriftungen im Relief */
+.lbl{position:absolute;left:0;top:0;white-space:nowrap;opacity:0;will-change:transform,opacity;
+  text-shadow:0 0 3px var(--halo),0 0 8px var(--halo),0 0 14px var(--halo)}
+.lbl.canton{font-family:var(--f-display);font-variation-settings:"wdth" 112;font-weight:650;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink)}
+.lbl.canton small{display:block;font-family:var(--f-body);font-weight:400;font-size:11px;letter-spacing:.04em;text-transform:none;color:var(--ink-2);text-align:center}
+.lbl.lake{font-family:var(--f-body);font-style:italic;font-weight:600;font-size:13.5px;letter-spacing:.05em;color:var(--lake-label);text-shadow:0 0 6px var(--lake-halo),0 1px 2px var(--lake-halo)}
+.lbl.peak{font-family:var(--f-body);font-size:13px;color:var(--ink);display:flex;align-items:center;gap:6px}
+.lbl.peak::before{content:"";width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid var(--ink)}
+.lbl.peak em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--ink-2)}
+.lbl.poi{font-family:var(--f-body);font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px}
+.lbl.poi::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 2px var(--halo);flex:none}
+.lbl.poi.on{font-size:14.5px}
+.lbl.poi.on::before{width:11px;height:11px}
+
+/* ---------- Tooltip */
+.tip{position:fixed;left:0;top:0;z-index:7;pointer-events:none;opacity:0;transition:opacity .15s;
+  background:var(--card);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:3px solid var(--brand);
+  padding:9px 12px 10px;min-width:11rem;box-shadow:0 10px 26px -16px var(--shadow)}
+.tip.on{opacity:1}
+.tip b{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-variation-settings:"wdth" 108;font-weight:680;font-size:15px;letter-spacing:.01em}
+.tip b img{width:14px;height:17px;object-fit:contain}
+.tip span{display:block;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+/* ---------- kleine Bildschirme: Karten unten, Relief darüber */
+@media (max-width:760px){
+  body{font-size:16px}
+  .chapter,.finale{align-items:flex-end;min-height:140svh}
+  .chapter .wrap,.finale .wrap{padding-bottom:9svh}
+  .card{padding:18px 18px 16px}
+  .card p{font-size:15.5px}
+  .finale .card{max-height:74svh;overflow:auto;overscroll-behavior:contain}
+  .tiles{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .hero{grid-template-rows:1fr auto auto}
+  .under{padding-block:24px 28px}
+}
+.noscene .cue{display:none}
+</style>
+</head>
+<body>
+
+<canvas id="scene" aria-hidden="true" tabindex="-1"></canvas>
+<div id="labels" aria-hidden="true"></div>
+<div class="progress" aria-hidden="true"><span id="prog"></span></div>
+<div class="mark" id="mark" aria-hidden="true"><img id="markW" src="data/wappen/CH.svg" alt=""><span><span id="markT">Schweizer</span> <i>Familien</i></span></div>
+<a class="pick" href="#kantone" id="pick"><img id="pickW" src="data/wappen/CH.svg" alt=""><span id="pickT">Kanton wählen</span></a>
+
+<nav class="nav" id="nav" aria-label="Kapitel">
+  <a href="#schweiz" data-for="schweiz"><span>Schweiz</span></a>
+  <a href="#lemanique" data-for="lemanique"><span>Genferseeregion</span></a>
+  <a href="#mittelland" data-for="mittelland"><span>Espace Mittelland</span></a>
+  <a href="#nordwest" data-for="nordwest"><span>Nordwestschweiz</span></a>
+  <a href="#zuerich" data-for="zuerich"><span>Zürich</span></a>
+  <a href="#zentral" data-for="zentral"><span>Zentralschweiz</span></a>
+  <a href="#ost" data-for="ost"><span>Ostschweiz</span></a>
+  <a href="#tessin" data-for="tessin"><span>Tessin</span></a>
+  <a href="#kantone" data-for="kantone"><span>Kantone</span></a>
+</nav>
+
+<div class="hud" aria-hidden="true">
+  <svg viewBox="0 0 34 34" id="north"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".35"/><path d="M17 5 L21.5 18 L17 15.6 L12.5 18 Z" fill="var(--brand)"/><path d="M17 29 L12.5 18 L17 20.4 L21.5 18 Z" fill="currentColor" fill-opacity=".35"/><text x="17" y="4.2" text-anchor="middle" font-size="5.5" font-family="IBM Plex Mono, monospace" fill="currentColor">N</text></svg>
+  <div><span class="st" id="hudA">Höhenmodell wird geladen …</span><span class="st" id="hudB">swissALTIRegio · LV95</span></div>
+</div>
+
+<div class="tip" id="tip" role="status" aria-live="polite"><b id="tipT"></b><span id="tipA"></span><span id="tipB"></span></div>
+
+<main>
+  <section class="hero" data-cam="hero" id="top">
+    <div aria-hidden="true"></div>
+    <div class="band">
+      <div class="wrap">
+        <div class="eyebrow"><img id="heroW" src="data/wappen/CH.svg" alt=""><span id="heroE">Schweiz · 46° 48′ N · 8° 14′ O</span></div>
+        <h1 id="heroT">Schweizer Familien</h1>
+      </div>
+    </div>
+    <div class="under">
+      <div class="wrap">
+        <p class="lead">Ein Relief der Schweiz aus den Höhendaten von swisstopo, mit allen 26 Kantonen und ihren Wahrzeichen. Wählen Sie Ihren Kanton: Die Seite übernimmt seine Farben.</p>
+        <div>
+          <div class="cue">Scrollen</div>
+          <div class="status" id="status"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="schweiz" id="schweiz">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Die Schweiz</p>
+        <h2 id="chH">26 Kantone</h2>
+        <p id="chP">Vom Lago Maggiore bis zur Dufourspitze. Die Linien zeigen die Landesgrenze und die Grenzen der Kantone nach swissBOUNDARIES3D, Stand 2026.</p>
+        <p class="hint hint-hover">Fahren Sie mit der Maus über das Relief, um einen Kanton zu sehen.</p>
+        <dl class="facts" id="chFacts"></dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="lemanique" id="lemanique">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Genferseeregion · Waadt · Wallis · Genf</p>
+        <h2>Vom Genfersee ins Rhonetal</h2>
+        <p>Die Rhone entspringt am Rhonegletscher, durchfliesst das Wallis und mündet zwischen Le Bouveret und Villeneuve in den Genfersee. Im Kanton Genf verlässt sie die Schweiz. Im Wallis steht mit der Dufourspitze der höchste Gipfel des Landes, am Nordufer des Sees liegen zwischen Lausanne und Vevey die Rebterrassen des Lavaux.</p>
+        <ul class="rows" data-rows="lemanique"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="mittelland" id="mittelland">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Espace Mittelland · Bern · Freiburg · Solothurn · Neuenburg · Jura</p>
+        <h2>Vom Oberland bis an den Doubs</h2>
+        <p>Die Region reicht von den Gletschern des Berner Oberlands über das Mittelland bis in die Ketten des Juras. Durch sie verläuft die Sprachgrenze: Bern und Freiburg sind zweisprachig, Neuenburg und Jura französischsprachig. In Bern tagen Bundesrat und Parlament.</p>
+        <ul class="rows" data-rows="mittelland"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="nordwest" id="nordwest">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Nordwestschweiz · Basel-Stadt · Basel-Landschaft · Aargau</p>
+        <h2>Am Rheinknie</h2>
+        <p>Bei Basel wendet sich der Rhein nach Norden. Am Dreiländereck treffen die Schweiz, Deutschland und Frankreich aufeinander. Im Aargau vereinigen sich Aare, Reuss und Limmat; die Gegend um Brugg heisst deshalb Wasserschloss der Schweiz.</p>
+        <ul class="rows" data-rows="nordwest"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="zuerich" id="zuerich">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Zürich</p>
+        <h2>Ein Kanton als eigene Grossregion</h2>
+        <p>Kein Kanton zählt mehr Einwohner. Er reicht vom Rhein im Norden bis an den oberen Zürichsee und ins Tösstal. Die Stadt Zürich liegt am Ausfluss der Limmat aus dem See.</p>
+        <ul class="rows" data-rows="zuerich"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="zentral" id="zentral">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Zentralschweiz · Luzern · Uri · Schwyz · Obwalden · Nidwalden · Zug</p>
+        <h2>Rund um den Vierwaldstättersee</h2>
+        <p>Uri, Schwyz und Unterwalden schlossen sich zum ersten Bund der Eidgenossenschaft zusammen. Der Bundesbrief ist auf Anfang August 1291 datiert; die Überlieferung verlegt den Schwur auf das Rütli am Urnersee.</p>
+        <ul class="rows" data-rows="zentral"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="ost" id="ost">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Ostschweiz · Glarus · Schaffhausen · Appenzell · St. Gallen · Graubünden · Thurgau</p>
+        <h2>Vom Bodensee bis ins Engadin</h2>
+        <p>Sieben Kantone, darunter Graubünden, der flächengrösste der Schweiz und der einzige mit drei Amtssprachen. Der Säntis überragt das Appenzellerland; im Süden erreicht die Region am Piz Bernina über 4000&nbsp;m.</p>
+        <ul class="rows" data-rows="ost"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="chapter" data-cam="tessin" id="tessin">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Tessin</p>
+        <h2>Südlich des Gotthards</h2>
+        <p>Das Tessin ist der einzige Kanton mit Italienisch als alleiniger Amtssprache. Am Lago Maggiore liegt auf 193&nbsp;m ü.&nbsp;M. der tiefste Punkt der Schweiz, keine 70&nbsp;km vom Rheinwaldhorn auf über 3400&nbsp;m entfernt.</p>
+        <ul class="rows" data-rows="tessin"></ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="finale" data-cam="kantone" id="kantone">
+    <div class="wrap">
+      <article class="card">
+        <p class="kicker">Alle Kantone</p>
+        <h2>Wählen Sie Ihren Kanton</h2>
+        <p>Die Seite übernimmt Wappen und Farben des Kantons, die Kamera fliegt hin.<span class="hint-hover"> Mit gedrückter Maustaste drehen Sie die Ansicht.</span></p>
+        <div class="tiles" id="tiles" role="group" aria-label="Kantone der Schweiz"></div>
+        <div class="detail" id="detail" aria-live="polite"></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="sig" id="sig">Schweizer Familien</div>
+    <p>Daten: Bundesamt für Landestopografie swisstopo. Höhenmodell swissALTIRegio (10&nbsp;m, hier auf 250&nbsp;m gemittelt), Grenzen, Flächen und Einwohnerzahlen aus swissBOUNDARIES3D (Stand 2026), Seen, Wald und Flüsse aus swissTLMRegio. Höchste und tiefste Punkte sind aus dem Höhenmodell berechnet und können von amtlichen Kotenangaben um wenige Meter abweichen. Höhen im Relief 2-fach überhöht, Koordinaten im Schweizer Landeskoordinatensystem LV95.</p>
+    <p>Wappen: Wikimedia Commons, gemeinfrei. Kantonsfarben an die Wappen angelehnt; keine offizielle Seite der Kantone.</p>
+    <p>© swisstopo</p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
+<script src="kantone.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

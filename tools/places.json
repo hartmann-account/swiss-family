@@ -1,0 +1,1303 @@
+{
+ "landmarks": {
+  "ZH": [
+   {
+    "name": "Grossmünster",
+    "E": 2683513,
+    "N": 1247185,
+    "h": 420,
+    "canton_check": "ZH",
+    "source_label": "KGS: Reformiertes Grossmünster mit Kreuzgang (Zwingliplatz 6/7)",
+    "note": ""
+   },
+   {
+    "name": "Uetliberg (Uto Kulm)",
+    "E": 2679589,
+    "N": 1244824,
+    "h": 871,
+    "canton_check": "ZH",
+    "source_label": "swissNAMES3D Huegel Uetliberg (Stallikon)",
+    "note": "Summit point; Hotel Uto Kulm is ~90 m W (2679503/1244858)."
+   },
+   {
+    "name": "Schloss Laufen am Rheinfall",
+    "E": 2688325,
+    "N": 1281304,
+    "h": 411,
+    "canton_check": "ZH",
+    "source_label": "Gazetteer: Historisches Areal Schloss (ZH) - Laufen-Uhwiesen",
+    "note": ""
+   },
+   {
+    "name": "Schloss Kyburg",
+    "E": 2698416,
+    "N": 1257218,
+    "h": 632,
+    "canton_check": "ZH",
+    "source_label": "KGS: Schloss Kyburg (Schloss 1, Illnau-Effretikon)",
+    "note": ""
+   }
+  ],
+  "BE": [
+   {
+    "name": "Zytglogge",
+    "E": 2600697,
+    "N": 1199653,
+    "h": 540,
+    "canton_check": "BE",
+    "source_label": "KGS: Zeitglockenturm, Bern",
+    "note": ""
+   },
+   {
+    "name": "Bundeshaus",
+    "E": 2600423,
+    "N": 1199521,
+    "h": 543,
+    "canton_check": "BE",
+    "source_label": "KGS: Bundeshaus (Bundesgasse 1-9) = address Bundesplatz 3 (Parlamentsgebäude)",
+    "note": ""
+   },
+   {
+    "name": "Jungfraujoch",
+    "E": 2641480,
+    "N": 1155334,
+    "h": 3466,
+    "canton_check": "BE",
+    "source_label": "Gazetteer: Pass Jungfraujoch (BE) - Lauterbrunnen",
+    "note": "BE side of the saddle; the Sphinx observatory itself (2641908/1155277) lies in VS (Fieschertal)."
+   },
+   {
+    "name": "Schloss Thun",
+    "E": 2614617,
+    "N": 1178778,
+    "h": 595,
+    "canton_check": "BE",
+    "source_label": "KGS: Schloss Thun (Schlossberg 1-4)",
+    "note": ""
+   }
+  ],
+  "LU": [
+   {
+    "name": "Kapellbrücke",
+    "E": 2666004,
+    "N": 1211500,
+    "h": 434,
+    "canton_check": "LU",
+    "source_label": "KGS: Kapellbrücke mit Bilderzyklus und Wasserturm",
+    "note": ""
+   },
+   {
+    "name": "Löwendenkmal",
+    "E": 2666267,
+    "N": 1212303,
+    "h": 440,
+    "canton_check": "LU",
+    "source_label": "KGS: Löwendenkmal mit Kapelle",
+    "note": ""
+   },
+   {
+    "name": "Pilatus",
+    "E": 2660137,
+    "N": 1202409,
+    "h": 2076,
+    "canton_check": "LU",
+    "source_label": "swissNAMES3D Gipfel Widderfeld (Pilatus massif)",
+    "note": "Pilatus Kulm/Esel/Oberhaupt are in OW, Tomlishorn in NW; nearest Pilatus summit inside LU is Widderfeld (2075 m), ~2 km W of Pilatus Kulm."
+   },
+   {
+    "name": "Museggmauer",
+    "E": 2665765,
+    "N": 1211836,
+    "h": 480,
+    "canton_check": "LU",
+    "source_label": "KGS: Stadtbefestigung (Museggmauer mit 9 Türmen)",
+    "note": "KGS reference point of the ~850 m long wall; centre section."
+   }
+  ],
+  "UR": [
+   {
+    "name": "Telldenkmal Altdorf",
+    "E": 2691872,
+    "N": 1192998,
+    "h": 459,
+    "canton_check": "UR",
+    "source_label": "KGS: Telldenkmal und Türmli (Rathausplatz)",
+    "note": ""
+   },
+   {
+    "name": "Rütli",
+    "E": 2687821,
+    "N": 1202642,
+    "h": 474,
+    "canton_check": "UR",
+    "source_label": "Gazetteer: Flurname Rütli (UR) - Seelisberg",
+    "note": "Rütli meadow (Rütlihaus 2687778/1202683). Note: hint N 1203900 was ~1.3 km off; gazetteer and WGS84 46.9685/8.5933 both give N ~1202600."
+   },
+   {
+    "name": "Teufelsbrücke",
+    "E": 2688163,
+    "N": 1166885,
+    "h": 1366,
+    "canton_check": "UR",
+    "source_label": "KGS: Alte und neue Teufelsbrücke (Schöllenen)",
+    "note": ""
+   },
+   {
+    "name": "Tellskapelle",
+    "E": 2689339,
+    "N": 1198616,
+    "h": 438,
+    "canton_check": "UR",
+    "source_label": "KGS: Tellskapelle bei der Tellsplatte (Sisikon)",
+    "note": ""
+   }
+  ],
+  "SZ": [
+   {
+    "name": "Bundesbriefmuseum",
+    "E": 2691961,
+    "N": 1208593,
+    "h": 513,
+    "canton_check": "SZ",
+    "source_label": "KGS: Bundesbriefmuseum (Bahnhofstrasse 20, Schwyz)",
+    "note": ""
+   },
+   {
+    "name": "Kloster Einsiedeln",
+    "E": 2699607,
+    "N": 1220355,
+    "h": 905,
+    "canton_check": "SZ",
+    "source_label": "KGS: Klosteranlage Einsiedeln mit Hauptplatz (Kloster 84)",
+    "note": ""
+   },
+   {
+    "name": "Grosser Mythen",
+    "E": 2695025,
+    "N": 1209522,
+    "h": 1896,
+    "canton_check": "SZ",
+    "source_label": "swissNAMES3D Hauptgipfel Gross Mythen",
+    "note": "Summit; summit restaurant at 2695030/1209497."
+   },
+   {
+    "name": "Rigi Kulm",
+    "E": 2679519,
+    "N": 1212281,
+    "h": 1797,
+    "canton_check": "SZ",
+    "source_label": "Gazetteer: Hauptgipfel Rigi Kulm (SZ) - Arth",
+    "note": ""
+   }
+  ],
+  "OW": [
+   {
+    "name": "Flüeli-Ranft",
+    "E": 2663479,
+    "N": 1191289,
+    "h": 664,
+    "canton_check": "OW",
+    "source_label": "KGS: Obere Ranftkapelle mit Eremitenklause (Ranft 1, Sachseln)",
+    "note": ""
+   },
+   {
+    "name": "Kloster Engelberg",
+    "E": 2673963,
+    "N": 1185950,
+    "h": 1006,
+    "canton_check": "OW",
+    "source_label": "KGS: Benediktinerkloster Engelberg",
+    "note": ""
+   },
+   {
+    "name": "Titlis",
+    "E": 2676315,
+    "N": 1180600,
+    "h": 3230,
+    "canton_check": "OW",
+    "source_label": "swissNAMES3D Alpiner Gipfel Titlis (2676315/1180580, BE) shifted 20 m N",
+    "note": "Summit name point lies in BE (Innertkirchen) on the OW/BE border; point moved 20 m N into OW."
+   },
+   {
+    "name": "Hexenturm Sarnen",
+    "E": 2661342,
+    "N": 1194167,
+    "h": 479,
+    "canton_check": "OW",
+    "source_label": "KGS: Hexenturm, Sarnen (Landenberg)",
+    "note": ""
+   }
+  ],
+  "NW": [
+   {
+    "name": "Stanserhorn",
+    "E": 2668666,
+    "N": 1198020,
+    "h": 1898,
+    "canton_check": "NW",
+    "source_label": "Gazetteer: Hauptgipfel Stanserhorn (NW) - Dallenwil",
+    "note": ""
+   },
+   {
+    "name": "Winkelrieddenkmal",
+    "E": 2670570,
+    "N": 1201015,
+    "h": 458,
+    "canton_check": "NW",
+    "source_label": "KGS: Winkelrieddenkmal (Rathausplatz Stans)",
+    "note": ""
+   },
+   {
+    "name": "Bürgenstock / Hammetschwand",
+    "E": 2672987,
+    "N": 1205919,
+    "h": 1128,
+    "canton_check": "NW",
+    "source_label": "Gazetteer: Haupthuegel/Aussichtspunkt Bürgenstock (NW) - Ennetbürgen",
+    "note": "Hammetschwand summit next to the lift top. The Hammetschwand-Lift itself (2672836/1205996) lies in an exclave of the City of Luzern (LU), so a NW point is used."
+   }
+  ],
+  "GL": [
+   {
+    "name": "Zaunplatz / Landsgemeindeplatz Glarus",
+    "E": 2723785,
+    "N": 1211025,
+    "h": 471,
+    "canton_check": "GL",
+    "source_label": "Mean of addresses Zaunplatz 2-16, Glarus",
+    "note": "Centre of the square derived from surrounding address points."
+   },
+   {
+    "name": "Freulerpalast",
+    "E": 2723348,
+    "N": 1217747,
+    "h": 437,
+    "canton_check": "GL",
+    "source_label": "KGS: Freulerpalast (Bahnhofstrasse 2, Näfels)",
+    "note": ""
+   },
+   {
+    "name": "Klöntalersee",
+    "E": 2715544,
+    "N": 1209083,
+    "h": 841,
+    "canton_check": "GL",
+    "source_label": "swissNAMES3D See Klöntalersee, interior label point",
+    "note": "Open-water point."
+   },
+   {
+    "name": "Tödi",
+    "E": 2712668,
+    "N": 1185547,
+    "h": 3602,
+    "canton_check": "GL",
+    "source_label": "swissNAMES3D Piz Russein (2712648/1185507, GR) shifted ~45 m into GL",
+    "note": "Main summit Piz Russein lies on GL/GR border (name point in GR); point ~45 m NNE inside GL."
+   }
+  ],
+  "ZG": [
+   {
+    "name": "Zytturm Zug",
+    "E": 2681620,
+    "N": 1224467,
+    "h": 421,
+    "canton_check": "ZG",
+    "source_label": "KGS: Stadtbefestigung (... Zytturm ...), Zug",
+    "note": "KGS point of the town fortifications, located at the Zytturm (west end of Kolinplatz); ±20 m."
+   },
+   {
+    "name": "Morgarten-Denkmal",
+    "E": 2691375,
+    "N": 1218022,
+    "h": 751,
+    "canton_check": "ZG",
+    "source_label": "Gazetteer: Denkmal Morgartendenkmal (ZG) - Oberägeri",
+    "note": ""
+   },
+   {
+    "name": "Höllgrotten",
+    "E": 2684790,
+    "N": 1226718,
+    "h": 520,
+    "canton_check": "ZG",
+    "source_label": "Gazetteer: Grotte Höllgrotten (ZG) - Menzingen",
+    "note": "Called \"Höllgrotten Baar\", but the caves lie on Menzingen/Neuheim territory (ZG)."
+   },
+   {
+    "name": "Wildspitz",
+    "E": 2686488,
+    "N": 1215458,
+    "h": 1576,
+    "canton_check": "ZG",
+    "source_label": "Gazetteer: Gipfel Wildspitz (ZG) - Unterägeri",
+    "note": "Summit on ZG/SZ border; point checks ZG."
+   }
+  ],
+  "FR": [
+   {
+    "name": "Kathedrale St. Nikolaus",
+    "E": 2578972,
+    "N": 1183925,
+    "h": 587,
+    "canton_check": "FR",
+    "source_label": "Gazetteer: Sakrales Gebaeude Cathédrale Saint-Nicolas (FR) - Fribourg",
+    "note": ""
+   },
+   {
+    "name": "Schloss Greyerz",
+    "E": 2572823,
+    "N": 1159327,
+    "h": 828,
+    "canton_check": "FR",
+    "source_label": "KGS: Château des comtes de Gruyères (Rue du Château 8)",
+    "note": ""
+   },
+   {
+    "name": "Altstadt Murten (Ringmauer)",
+    "E": 2575648,
+    "N": 1197491,
+    "h": 463,
+    "canton_check": "FR",
+    "source_label": "KGS: Befestigungsanlagen Murten (Ringmauer, Türme)",
+    "note": ""
+   },
+   {
+    "name": "Moléson",
+    "E": 2567670,
+    "N": 1155368,
+    "h": 2002,
+    "canton_check": "FR",
+    "source_label": "swissNAMES3D Hauptgipfel Le Moléson",
+    "note": ""
+   }
+  ],
+  "SO": [
+   {
+    "name": "St.-Ursen-Kathedrale",
+    "E": 2607632,
+    "N": 1228594,
+    "h": 442,
+    "canton_check": "SO",
+    "source_label": "Gazetteer: Sakrales Gebaeude St. Ursen-Kathedrale (SO)",
+    "note": ""
+   },
+   {
+    "name": "Weissenstein",
+    "E": 2605330,
+    "N": 1233448,
+    "h": 1284,
+    "canton_check": "SO",
+    "source_label": "Gazetteer: Gebaeude Hotel Weissenstein (SO) - Oberdorf",
+    "note": "Kurhaus/Hotel on the Weissenstein ridge."
+   },
+   {
+    "name": "Zytglogge Solothurn",
+    "E": 2607445,
+    "N": 1228521,
+    "h": 434,
+    "canton_check": "SO",
+    "source_label": "KGS: Zeitglockenturm (Hauptgasse 44, Marktplatz)",
+    "note": ""
+   }
+  ],
+  "BS": [
+   {
+    "name": "Basler Münster",
+    "E": 2611541,
+    "N": 1267296,
+    "h": 270,
+    "canton_check": "BS",
+    "source_label": "KGS: Münster mit Kreuzgängen und Pfalz (Münsterplatz 9)",
+    "note": ""
+   },
+   {
+    "name": "Rathaus Basel",
+    "E": 2611253,
+    "N": 1267502,
+    "h": 253,
+    "canton_check": "BS",
+    "source_label": "KGS: Rathaus (Marktplatz 9)",
+    "note": ""
+   },
+   {
+    "name": "Mittlere Brücke",
+    "E": 2611372,
+    "N": 1267727,
+    "h": 245,
+    "canton_check": "BS",
+    "source_label": "KGS: Mittlere Rheinbrücke (Eisengasse/Greifengasse)",
+    "note": "Mid-span of bridge."
+   },
+   {
+    "name": "Dreiländereck",
+    "E": 2611370,
+    "N": 1270882,
+    "h": 246,
+    "canton_check": "BS",
+    "source_label": "Gazetteer: Denkmal Dreiländereck (BS)",
+    "note": "Monument (pylon) on the Swiss bank; the actual tripoint is in the Rhine."
+   }
+  ],
+  "BL": [
+   {
+    "name": "Augusta Raurica (Römisches Theater)",
+    "E": 2621353,
+    "N": 1264761,
+    "h": 285,
+    "canton_check": "BL",
+    "source_label": "Gazetteer: Historisches Areal Theater (BL) - Augst",
+    "note": ""
+   },
+   {
+    "name": "Schloss Wildenstein",
+    "E": 2622438,
+    "N": 1253306,
+    "h": 505,
+    "canton_check": "BL",
+    "source_label": "KGS: Schloss Wildenstein (Bubendorf)",
+    "note": ""
+   },
+   {
+    "name": "Sissacher Fluh",
+    "E": 2628531,
+    "N": 1258872,
+    "h": 697,
+    "canton_check": "BL",
+    "source_label": "Gazetteer: Aussichtspunkt Sissacherflue (BL)",
+    "note": ""
+   },
+   {
+    "name": "Törli (Obertor) Liestal",
+    "E": 2622285,
+    "N": 1259418,
+    "h": 321,
+    "canton_check": "BL",
+    "source_label": "Derived: north end of Rathausstrasse (addresses Rathausstrasse 1/2)",
+    "note": "Approximate (±30 m): Törli not in gazetteer/KGS; placed at the north entrance of the old town at the end of Rathausstrasse."
+   }
+  ],
+  "SH": [
+   {
+    "name": "Rheinfall",
+    "E": 2688410,
+    "N": 1281481,
+    "h": 376,
+    "canton_check": "SH",
+    "source_label": "Gazetteer: Wasserfall Rheinfall (2688390/1281451, ZH) shifted ~36 m into SH",
+    "note": "The falls straddle the ZH/SH border (Rhine); point moved to SH (Neuhausen) half of the falls."
+   },
+   {
+    "name": "Munot",
+    "E": 2690200,
+    "N": 1283607,
+    "h": 422,
+    "canton_check": "SH",
+    "source_label": "Gazetteer: Historisches Areal Festung Munot (SH)",
+    "note": ""
+   },
+   {
+    "name": "Altstadt Stein am Rhein (Rathausplatz)",
+    "E": 2706731,
+    "N": 1279716,
+    "h": 401,
+    "canton_check": "SH",
+    "source_label": "Mean of addresses Rathausplatz 1-8 (Rathaus KGS 2706742/1279702)",
+    "note": ""
+   },
+   {
+    "name": "Kloster Allerheiligen",
+    "E": 2689893,
+    "N": 1283410,
+    "h": 392,
+    "canton_check": "SH",
+    "source_label": "KGS: Ehemalige Benediktinerabtei Allerheiligen (Münsterplatz)",
+    "note": ""
+   }
+  ],
+  "AR": [
+   {
+    "name": "Säntis",
+    "E": 2744111,
+    "N": 1234938,
+    "h": 2463,
+    "canton_check": "AR",
+    "source_label": "swissNAMES3D Alpiner Gipfel Säntis (2744171/1234918, AI) shifted ~63 m W into AR",
+    "note": "Summit point lies in AI; nearest AR terrain is ~60 m W (h ~2463 vs summit 2502)."
+   },
+   {
+    "name": "Landsgemeindeplatz Trogen",
+    "E": 2752950,
+    "N": 1252780,
+    "h": 902,
+    "canton_check": "AR",
+    "source_label": "Mean of addresses Landsgemeindeplatz 1-5 Trogen",
+    "note": ""
+   },
+   {
+    "name": "Kinderdorf Pestalozzi",
+    "E": 2752613,
+    "N": 1252311,
+    "h": 960,
+    "canton_check": "AR",
+    "source_label": "Gazetteer: Quartierteil Kinderdorf (AR) - Trogen",
+    "note": ""
+   },
+   {
+    "name": "Hundwiler Höhi",
+    "E": 2743164,
+    "N": 1245056,
+    "h": 1302,
+    "canton_check": "AR",
+    "source_label": "Gazetteer: Haupthuegel Hundwiler Höhi (2743184/1245056, AI) shifted 20 m W into AR",
+    "note": "Summit on AR/AI border, name point in AI (Gonten)."
+   }
+  ],
+  "AI": [
+   {
+    "name": "Seealpsee",
+    "E": 2748471,
+    "N": 1237112,
+    "h": 1142,
+    "canton_check": "AI",
+    "source_label": "swissNAMES3D See Seealpsee, interior label point",
+    "note": "Open-water point."
+   },
+   {
+    "name": "Berggasthaus Äscher / Wildkirchli",
+    "E": 2749452,
+    "N": 1238822,
+    "h": 1479,
+    "canton_check": "AI",
+    "source_label": "Address Äscher 1, Wasserauen (KGS Wildkirchli 2749505/1238958)",
+    "note": "Guesthouse; Wildkirchli caves ~140 m N."
+   },
+   {
+    "name": "Hoher Kasten",
+    "E": 2754782,
+    "N": 1239016,
+    "h": 1758,
+    "canton_check": "AI",
+    "source_label": "Gazetteer: Hauptgipfel Hoher Kasten (2754802/1238996, SG) shifted ~28 m into AI",
+    "note": "Summit point lies in SG (Altstätten); AI/SG border runs over the summit."
+   },
+   {
+    "name": "Landsgemeindeplatz Appenzell",
+    "E": 2748810,
+    "N": 1244185,
+    "h": 776,
+    "canton_check": "AI",
+    "source_label": "Gazetteer: Landsgemeindeplatz (AI) - Appenzell",
+    "note": ""
+   }
+  ],
+  "SG": [
+   {
+    "name": "Stiftsbezirk / Kathedrale St. Gallen",
+    "E": 2746294,
+    "N": 1254299,
+    "h": 674,
+    "canton_check": "SG",
+    "source_label": "Address Klosterhof 6 (Kathedrale), KGS Stiftsbezirk 2746270/1254316",
+    "note": ""
+   },
+   {
+    "name": "Schloss Rapperswil",
+    "E": 2704284,
+    "N": 1231626,
+    "h": 433,
+    "canton_check": "SG",
+    "source_label": "KGS: Schloss Rapperswil (Lindenhof)",
+    "note": ""
+   },
+   {
+    "name": "Churfirsten (Hinterrugg)",
+    "E": 2741548,
+    "N": 1224204,
+    "h": 2306,
+    "canton_check": "SG",
+    "source_label": "swissNAMES3D Hauptgipfel Hinderrugg",
+    "note": "Highest Churfirst."
+   },
+   {
+    "name": "Taminaschlucht (Altes Bad Pfäfers)",
+    "E": 2755923,
+    "N": 1204560,
+    "h": 686,
+    "canton_check": "SG",
+    "source_label": "Gazetteer: Gebaeude Altes Bad Pfäfers (SG)",
+    "note": ""
+   }
+  ],
+  "GR": [
+   {
+    "name": "Landwasserviadukt",
+    "E": 2771155,
+    "N": 1172409,
+    "h": 997,
+    "canton_check": "GR",
+    "source_label": "Gazetteer: Schmalspur Landwasserviadukt (Schmitten/Bergün Filisur)",
+    "note": ""
+   },
+   {
+    "name": "Piz Bernina",
+    "E": 2789946,
+    "N": 1139765,
+    "h": 4048,
+    "canton_check": "GR",
+    "source_label": "Gazetteer: Alpiner Gipfel Piz Bernina (GR) - Pontresina",
+    "note": ""
+   },
+   {
+    "name": "Kloster St. Johann Müstair",
+    "E": 2830444,
+    "N": 1168714,
+    "h": 1248,
+    "canton_check": "GR",
+    "source_label": "Gazetteer: Clastra S. Gian (GR) - Val Müstair",
+    "note": ""
+   },
+   {
+    "name": "Ruinaulta",
+    "E": 2743600,
+    "N": 1185578,
+    "h": 629,
+    "canton_check": "GR",
+    "source_label": "Gazetteer: Graben Ruinaulta (GR)",
+    "note": "Central point of the Rhine gorge (near Versam)."
+   },
+   {
+    "name": "Schweizerischer Nationalpark (Il Fuorn)",
+    "E": 2812152,
+    "N": 1171809,
+    "h": 1797,
+    "canton_check": "GR",
+    "source_label": "Gazetteer: Ort Il Fuorn (GR) - Zernez",
+    "note": ""
+   }
+  ],
+  "AG": [
+   {
+    "name": "Schloss Lenzburg",
+    "E": 2656372,
+    "N": 1248785,
+    "h": 499,
+    "canton_check": "AG",
+    "source_label": "KGS: Schloss Lenzburg",
+    "note": ""
+   },
+   {
+    "name": "Schloss Habsburg",
+    "E": 2655965,
+    "N": 1257124,
+    "h": 506,
+    "canton_check": "AG",
+    "source_label": "KGS: Schloss, Habsburg (Schlossgasse 30)",
+    "note": ""
+   },
+   {
+    "name": "Kloster Muri",
+    "E": 2668059,
+    "N": 1236392,
+    "h": 476,
+    "canton_check": "AG",
+    "source_label": "KGS: Ehemaliges Benediktinerkloster Muri (Marktstrasse 2/4)",
+    "note": ""
+   },
+   {
+    "name": "Wasserschloss der Schweiz",
+    "E": 2660180,
+    "N": 1260611,
+    "h": 328,
+    "canton_check": "AG",
+    "source_label": "Derived: confluence Reuss/Aare from swissNAMES3D river lines",
+    "note": "Reuss–Aare confluence (Limmat joins ~1 km N at 2660023/1261628)."
+   }
+  ],
+  "TG": [
+   {
+    "name": "Kartause Ittingen",
+    "E": 2707413,
+    "N": 1271324,
+    "h": 426,
+    "canton_check": "TG",
+    "source_label": "KGS: Ehemalige Kartause Ittingen",
+    "note": ""
+   },
+   {
+    "name": "Schloss Arenenberg",
+    "E": 2721699,
+    "N": 1281478,
+    "h": 456,
+    "canton_check": "TG",
+    "source_label": "KGS: Schloss Arenenberg mit Kapelle und Park",
+    "note": ""
+   },
+   {
+    "name": "Kloster Fischingen",
+    "E": 2715430,
+    "N": 1252321,
+    "h": 629,
+    "canton_check": "TG",
+    "source_label": "Gazetteer: Klosterareal Kloster (TG) - Fischingen",
+    "note": ""
+   },
+   {
+    "name": "Schloss Frauenfeld",
+    "E": 2709759,
+    "N": 1268187,
+    "h": 417,
+    "canton_check": "TG",
+    "source_label": "KGS: Schloss Frauenfeld (Rathausplatz 2)",
+    "note": ""
+   }
+  ],
+  "TI": [
+   {
+    "name": "Castelgrande",
+    "E": 2722219,
+    "N": 1116895,
+    "h": 276,
+    "canton_check": "TI",
+    "source_label": "KGS: Castel Grande, Bellinzona",
+    "note": ""
+   },
+   {
+    "name": "Madonna del Sasso",
+    "E": 2704651,
+    "N": 1114649,
+    "h": 346,
+    "canton_check": "TI",
+    "source_label": "KGS: Sacro Monte ... Madonna del Sasso (Orselina)",
+    "note": ""
+   },
+   {
+    "name": "Monte San Giorgio",
+    "E": 2717251,
+    "N": 1085839,
+    "h": 1097,
+    "canton_check": "TI",
+    "source_label": "Gazetteer: Haupthuegel Monte San Giorgio (TI) - Mendrisio",
+    "note": ""
+   },
+   {
+    "name": "Ponte dei Salti",
+    "E": 2707732,
+    "N": 1124136,
+    "h": 540,
+    "canton_check": "TI",
+    "source_label": "Gazetteer: Strasse Ponte dei Salti (TI) - Verzasca (Lavertezzo)",
+    "note": ""
+   }
+  ],
+  "VD": [
+   {
+    "name": "Château de Chillon",
+    "E": 2560728,
+    "N": 1140415,
+    "h": 373,
+    "canton_check": "VD",
+    "source_label": "KGS: Château de Chillon (Veytaux)",
+    "note": ""
+   },
+   {
+    "name": "Lavaux",
+    "E": 2547196,
+    "N": 1148913,
+    "h": 468,
+    "canton_check": "VD",
+    "source_label": "Gazetteer: Gebiet Lavaux (VD)",
+    "note": "Vineyard terraces between Epesses and Chexbres (h ~470 m)."
+   },
+   {
+    "name": "Cathédrale de Lausanne",
+    "E": 2538361,
+    "N": 1152682,
+    "h": 526,
+    "canton_check": "VD",
+    "source_label": "KGS: Cathédrale Notre-Dame, Lausanne",
+    "note": ""
+   },
+   {
+    "name": "Rochers de Naye",
+    "E": 2564442,
+    "N": 1142378,
+    "h": 2042,
+    "canton_check": "VD",
+    "source_label": "Gazetteer: Hauptgipfel Rochers de Naye (VD) - Veytaux",
+    "note": ""
+   }
+  ],
+  "VS": [
+   {
+    "name": "Matterhorn",
+    "E": 2617049,
+    "N": 1091693,
+    "h": 4456,
+    "canton_check": "VS",
+    "source_label": "swissNAMES3D Alpiner Gipfel Matterhorn (2617049/1091673, on CH/IT border) shifted 20 m N",
+    "note": "Summit lies on the national border (no canton); point 20 m N on the Swiss side."
+   },
+   {
+    "name": "Grosser Aletschgletscher (Konkordiaplatz)",
+    "E": 2645856,
+    "N": 1150524,
+    "h": 2662,
+    "canton_check": "VS",
+    "source_label": "Gazetteer: Gletscher Konkordiaplatz (VS) - Fieschertal",
+    "note": ""
+   },
+   {
+    "name": "Basilique de Valère",
+    "E": 2594267,
+    "N": 1120249,
+    "h": 612,
+    "canton_check": "VS",
+    "source_label": "KGS: Église et château Notre-Dame de Valère (Sion)",
+    "note": ""
+   },
+   {
+    "name": "Barrage de la Grande Dixence",
+    "E": 2597255,
+    "N": 1103230,
+    "h": 2364,
+    "canton_check": "VS",
+    "source_label": "KGS: Barrage de la Grande Dixence (Hérémence)",
+    "note": "On the dam crest (h ~2364)."
+   }
+  ],
+  "NE": [
+   {
+    "name": "Creux du Van",
+    "E": 2545854,
+    "N": 1198660,
+    "h": 1126,
+    "canton_check": "NE",
+    "source_label": "Gazetteer: Graben Creux du Van (NE)",
+    "note": "Centre of the cirque."
+   },
+   {
+    "name": "Château et Collégiale de Neuchâtel",
+    "E": 2561007,
+    "N": 1204662,
+    "h": 473,
+    "canton_check": "NE",
+    "source_label": "KGS: Collégiale de Neuchâtel (Château KGS 2561060/1204691)",
+    "note": "Collégiale; castle adjoins ~60 m E."
+   },
+   {
+    "name": "La Chaux-de-Fonds (Musée international d'horlogerie)",
+    "E": 2553867,
+    "N": 1216770,
+    "h": 1004,
+    "canton_check": "NE",
+    "source_label": "KGS: Musée international d'horlogerie",
+    "note": ""
+   },
+   {
+    "name": "Saut du Doubs",
+    "E": 2544973,
+    "N": 1215372,
+    "h": 731,
+    "canton_check": "NE",
+    "source_label": "Gazetteer: Wasserfall Saut du Doubs (NE) - Le Locle",
+    "note": "Waterfall on the CH/FR border river; point checks NE."
+   }
+  ],
+  "GE": [
+   {
+    "name": "Jet d'eau",
+    "E": 2500999,
+    "N": 1118136,
+    "h": 372,
+    "canton_check": "GE",
+    "source_label": "Gazetteer: Brunnen Jet d'eau (GE)",
+    "note": ""
+   },
+   {
+    "name": "Cathédrale Saint-Pierre",
+    "E": 2500386,
+    "N": 1117451,
+    "h": 400,
+    "canton_check": "GE",
+    "source_label": "KGS: Cathédrale St-Pierre (Cour de St-Pierre 8)",
+    "note": ""
+   },
+   {
+    "name": "Palais des Nations",
+    "E": 2499782,
+    "N": 1120027,
+    "h": 411,
+    "canton_check": "GE",
+    "source_label": "KGS: Palais des Nations (Avenue de la Paix 8)",
+    "note": ""
+   },
+   {
+    "name": "Mur des Réformateurs",
+    "E": 2500220,
+    "N": 1117350,
+    "h": 379,
+    "canton_check": "GE",
+    "source_label": "KGS: Parc des Bastions avec Mur des Réformateurs",
+    "note": "KGS point for park + wall; wall itself within ~50 m."
+   }
+  ],
+  "JU": [
+   {
+    "name": "Collégiale de Saint-Ursanne",
+    "E": 2578510,
+    "N": 1246063,
+    "h": 440,
+    "canton_check": "JU",
+    "source_label": "KGS: Collégiale, cloître et ancienne église St-Pierre (St-Ursanne)",
+    "note": ""
+   },
+   {
+    "name": "Château de Porrentruy",
+    "E": 2572324,
+    "N": 1252132,
+    "h": 459,
+    "canton_check": "JU",
+    "source_label": "KGS: Château, Porrentruy (Le Château 8-14)",
+    "note": ""
+   },
+   {
+    "name": "Étang de la Gruère",
+    "E": 2570277,
+    "N": 1232056,
+    "h": 997,
+    "canton_check": "JU",
+    "source_label": "swissNAMES3D See Etang de la Gruère, interior label point",
+    "note": "Open-water point."
+   },
+   {
+    "name": "Delémont Vieille Ville",
+    "E": 2592850,
+    "N": 1246040,
+    "h": 430,
+    "canton_check": "JU",
+    "source_label": "Address Place de la Liberté 1, Delémont (Hôtel de Ville)",
+    "note": "Old-town centre; Château des princes-évêques at 2592760/1245907."
+   }
+  ]
+ },
+ "peaks": [
+  {
+   "name": "Dufourspitze",
+   "E": 2633206,
+   "N": 1087340,
+   "h": 4630,
+   "canton_check": "VS",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Matterhorn",
+   "E": 2617049,
+   "N": 1091673,
+   "h": 4477,
+   "canton_check": "VS (border)",
+   "note": "On CH/IT border. Exact summit on national border (canton lookup empty); point 20 m N is VS. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Dom",
+   "E": 2632500,
+   "N": 1104798,
+   "h": 4544,
+   "canton_check": "VS",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Weisshorn",
+   "E": 2621453,
+   "N": 1105565,
+   "h": 4505,
+   "canton_check": "VS",
+   "note": "VS Weisshorn (not the Arosa Weisshorn). h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Finsteraarhorn",
+   "E": 2652736,
+   "N": 1154237,
+   "h": 4272,
+   "canton_check": "VS",
+   "note": "On BE/VS border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Jungfrau",
+   "E": 2640192,
+   "N": 1154077,
+   "h": 4158,
+   "canton_check": "BE",
+   "note": "On BE/VS border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Eiger",
+   "E": 2643446,
+   "N": 1158638,
+   "h": 3966,
+   "canton_check": "BE",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Mönch",
+   "E": 2642835,
+   "N": 1156513,
+   "h": 4107,
+   "canton_check": "BE",
+   "note": "On BE/VS border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Piz Bernina",
+   "E": 2789946,
+   "N": 1139765,
+   "h": 4048,
+   "canton_check": "GR",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Tödi",
+   "E": 2712648,
+   "N": 1185507,
+   "h": 3612,
+   "canton_check": "GR",
+   "note": "Main summit Piz Russein; on GL/GR border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Titlis",
+   "E": 2676315,
+   "N": 1180580,
+   "h": 3238,
+   "canton_check": "BE",
+   "note": "On OW/BE border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Säntis",
+   "E": 2744171,
+   "N": 1234908,
+   "h": 2502,
+   "canton_check": "SG",
+   "note": "On AI/AR/SG junction area. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Pilatus",
+   "E": 2661062,
+   "N": 1202842,
+   "h": 2128,
+   "canton_check": "NW",
+   "note": "Highest summit Tomlishorn; Pilatus Kulm/Esel (2662199/1203444) is in OW. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Rigi",
+   "E": 2679519,
+   "N": 1212281,
+   "h": 1797,
+   "canton_check": "SZ",
+   "note": "Rigi Kulm. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Grand Combin",
+   "E": 2589186,
+   "N": 1087341,
+   "h": 4309,
+   "canton_check": "VS",
+   "note": "Combin de Grafeneire (main summit). h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Dents du Midi",
+   "E": 2560188,
+   "N": 1112300,
+   "h": 3252,
+   "canton_check": "VS",
+   "note": "Haute Cime (highest). h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Chasseral",
+   "E": 2571227,
+   "N": 1220302,
+   "h": 1606,
+   "canton_check": "BE",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Napf",
+   "E": 2638133,
+   "N": 1205962,
+   "h": 1407,
+   "canton_check": "BE",
+   "note": "On BE/LU border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Piz Kesch",
+   "E": 2786410,
+   "N": 1166230,
+   "h": 3418,
+   "canton_check": "GR",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Rheinwaldhorn",
+   "E": 2722950,
+   "N": 1150414,
+   "h": 3401,
+   "canton_check": "GR",
+   "note": "On GR/TI border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Monte Generoso",
+   "E": 2722648,
+   "N": 1087869,
+   "h": 1700,
+   "canton_check": "TI",
+   "note": "On CH/IT border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Niesen",
+   "E": 2616363,
+   "N": 1166131,
+   "h": 2362,
+   "canton_check": "BE",
+   "note": "h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  },
+  {
+   "name": "Wildspitz",
+   "E": 2686488,
+   "N": 1215448,
+   "h": 1579,
+   "canton_check": "SZ",
+   "note": "On ZG/SZ border. h = max of swisstopo height service (swissALTI3D) on 3x3 grid (10 m) around swissNAMES3D summit point; gazetteer has no official spot height."
+  }
+ ],
+ "lakes": [
+  {
+   "name": "Genfersee",
+   "E": 2532196,
+   "N": 1145007,
+   "h": 372
+  },
+  {
+   "name": "Bodensee",
+   "E": 2752454,
+   "N": 1270981,
+   "h": 396
+  },
+  {
+   "name": "Neuenburgersee",
+   "E": 2560570,
+   "N": 1199994,
+   "h": 429
+  },
+  {
+   "name": "Lago Maggiore",
+   "E": 2702280,
+   "N": 1109959,
+   "h": 193
+  },
+  {
+   "name": "Vierwaldstättersee",
+   "E": 2671296,
+   "N": 1208002,
+   "h": 434
+  },
+  {
+   "name": "Zürichsee",
+   "E": 2697338,
+   "N": 1230794,
+   "h": 406
+  },
+  {
+   "name": "Luganersee",
+   "E": 2718589,
+   "N": 1094504,
+   "h": 270
+  },
+  {
+   "name": "Thunersee",
+   "E": 2621917,
+   "N": 1170241,
+   "h": 558
+  },
+  {
+   "name": "Bielersee",
+   "E": 2579704,
+   "N": 1214427,
+   "h": 429
+  },
+  {
+   "name": "Zugersee",
+   "E": 2679470,
+   "N": 1223726,
+   "h": 414
+  },
+  {
+   "name": "Brienzersee",
+   "E": 2642338,
+   "N": 1176504,
+   "h": 564
+  },
+  {
+   "name": "Walensee",
+   "E": 2736086,
+   "N": 1220421,
+   "h": 420
+  },
+  {
+   "name": "Murtensee",
+   "E": 2571801,
+   "N": 1197019,
+   "h": 429
+  },
+  {
+   "name": "Sempachersee",
+   "E": 2655072,
+   "N": 1221005,
+   "h": 504
+  },
+  {
+   "name": "Hallwilersee",
+   "E": 2658864,
+   "N": 1236758,
+   "h": 449
+  },
+  {
+   "name": "Lac de Joux",
+   "E": 2512021,
+   "N": 1166109,
+   "h": 1004
+  },
+  {
+   "name": "Sihlsee",
+   "E": 2701469,
+   "N": 1221829,
+   "h": 889
+  },
+  {
+   "name": "Sarnersee",
+   "E": 2658438,
+   "N": 1190254,
+   "h": 469
+  },
+  {
+   "name": "Ägerisee",
+   "E": 2689631,
+   "N": 1219911,
+   "h": 724
+  },
+  {
+   "name": "Silsersee",
+   "E": 2776699,
+   "N": 1143902,
+   "h": 1796
+  },
+  {
+   "name": "Greifensee",
+   "E": 2693397,
+   "N": 1245588,
+   "h": 435
+  },
+  {
+   "name": "Lac de la Gruyère",
+   "E": 2573690,
+   "N": 1169490,
+   "h": 674
+  }
+ ]
+}
