@@ -111,6 +111,7 @@ function renderDetail() {
      ['Fläche', km2(c.ha) + ' km²'], ['Einwohner', swiss(c.pop)], ['Gemeinden', String(c.gem)], ['Höhenlage', c.hmin + '–' + swiss(c.hmax) + ' m']]
       .map(function (f) { return '<div><dt>' + f[0] + '</dt><dd>' + esc(f[1]) + '</dd></div>'; }).join('') +
     '</dl>' +
+    '<button type="button" class="xgo" data-x="1"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.8 5.2 9 9 5.2 10.8 7 7z" fill="currentColor"/></svg>' + esc(K.name) + ' in 3D erkunden</button>' +
     '<p class="kicker" style="margin:18px 0 0">Wahrzeichen</p>' +
     '<ul class="marks">' + marks.map(function (m, i) {
       return '<li><button type="button" data-m="' + i + '" aria-pressed="' + (selMark === i ? 'true' : 'false') + '"><b>' + esc(m.name) + '</b><small>' + esc(m.text) + '</small></button></li>';
@@ -148,7 +149,9 @@ tilesEl.addEventListener('click', function (e) {
   var code = b.dataset.k;
   selectCanton(code === 'CH' || (selected && selected.code === code) ? null : code, { scroll: true });
 });
+var exploreAt = function () {};
 detailEl.addEventListener('click', function (e) {
+  if (e.target.closest('button[data-x]') && selected) { setExplore(true, 'orbit'); exploreAt(selected); return; }
   var b = e.target.closest('button[data-m]'); if (!b) return;
   var i = +b.dataset.m;
   selMark = selMark === i ? -1 : i;
@@ -160,16 +163,16 @@ function inFinale() { var y = window.scrollY + window.innerHeight * 0.5; return 
 
 /* ---------------- Ebenen (Legende) ---------------- */
 var POICAT = [
-  { k: 'bahn', label: 'Bahnhöfe', color: '#D7141A', on: true },
-  { k: 'play', label: 'Spielplätze', color: '#F08A00', on: true },
-  { k: 'bad', label: 'Badis & Badeplätze', color: '#0A8BD0', on: false },
-  { k: 'zoo', label: 'Zoos & Tierparks', color: '#5E8C2B', on: false },
-  { k: 'seilbahn', label: 'Bergbahnen', color: '#7A4FB5', on: false },
-  { k: 'feuer', label: 'Feuerstellen', color: '#D9531E', on: false },
-  { k: 'museum', label: 'Museen', color: '#8A6A4A', on: false },
-  { k: 'camping', label: 'Campingplätze', color: '#2E7D4F', on: false },
-  { k: 'aussicht', label: 'Aussichtspunkte', color: '#4B5568', on: false },
-  { k: 'spital', label: 'Spitäler', color: '#1E5AA8', on: false }
+  { k: 'bahn', label: 'Bahnhöfe', one: 'Bahnhof', far: 45000, color: '#D7141A', on: true },
+  { k: 'play', label: 'Spielplätze', one: 'Spielplatz', far: 14000, color: '#F08A00', on: true },
+  { k: 'bad', label: 'Badis & Badeplätze', one: 'Badi', far: 30000, color: '#0A8BD0', on: false },
+  { k: 'zoo', label: 'Zoos & Tierparks', one: 'Zoo oder Tierpark', far: 45000, color: '#5E8C2B', on: false },
+  { k: 'seilbahn', label: 'Bergbahnen', one: 'Bergbahn', far: 40000, color: '#7A4FB5', on: false },
+  { k: 'feuer', label: 'Feuerstellen', one: 'Feuerstelle', far: 11000, color: '#D9531E', on: false },
+  { k: 'museum', label: 'Museen', one: 'Museum', far: 28000, color: '#8A6A4A', on: false },
+  { k: 'camping', label: 'Campingplätze', one: 'Campingplatz', far: 35000, color: '#2E7D4F', on: false },
+  { k: 'aussicht', label: 'Aussichtspunkte', one: 'Aussichtspunkt', far: 24000, color: '#4B5568', on: false },
+  { k: 'spital', label: 'Spitäler', one: 'Spital', far: 40000, color: '#1E5AA8', on: false }
 ];
 var LAYERS = { sat: true, trails: true, marks: true, borders: true, water: true, labels: true };
 POICAT.forEach(function (c) { LAYERS[c.k] = c.on; });
@@ -580,26 +583,27 @@ function start() {
   }
 
   /* ---------------- Punktebenen (Spielplätze, Bahnhöfe …) ---------------- */
-  var POI = null, poiOn = new Array(16).fill(0), POI_FAR = 42000;
+  var POI = null, poiOn = new Array(16).fill(0), POI_FAR = 45000, poiFar = new Array(16).fill(POI_FAR);
+  POICAT.forEach(function (c, i) { poiFar[i] = c.far || POI_FAR; });
   var atlas = new THREE.CanvasTexture(ICONS.canvas); atlas.generateMipmaps = true; atlas.minFilter = THREE.LinearMipmapLinearFilter;
   var poiMat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false,
-    uniforms: { uAtlas: { value: atlas }, uOn: { value: poiOn }, uFar: { value: POI_FAR }, uPR: { value: 1 }, uHot: { value: -1 } },
+    uniforms: { uAtlas: { value: atlas }, uOn: { value: poiOn }, uFarC: { value: poiFar }, uPR: { value: 1 }, uHot: { value: -1 } },
     vertexShader: [
       'attribute float aCat; attribute float aId;',
-      'uniform float uOn[16]; uniform float uFar; uniform float uPR; uniform float uHot;',
+      'uniform float uOn[16]; uniform float uFarC[16]; uniform float uPR; uniform float uHot;',
       'varying float vCat; varying float vA;',
       'void main(){',
       '  vec4 w = modelMatrix*vec4(position,1.0);',
       '  float dist = distance(w.xyz, cameraPosition);',
-      '  float on = 0.0; for(int i=0;i<16;i++){ if(abs(float(i)-aCat)<0.5) on = uOn[i]; }',
+      '  float on = 0.0, uFar = 1.0; for(int i=0;i<16;i++){ if(abs(float(i)-aCat)<0.5){ on = uOn[i]; uFar = uFarC[i]; } }',
       '  vA = on*(1.0 - smoothstep(uFar*0.6, uFar, dist));',
       '  w.xyz += normalize(cameraPosition - w.xyz)*min(dist*0.02, 400.0);',
       '  w.y += min(dist*0.006, 120.0);',
       '  vCat = aCat;',
       '  gl_Position = projectionMatrix*viewMatrix*w;',
       '  float hot = abs(aId-uHot) < 0.5 ? 1.35 : 1.0;',
-      '  gl_PointSize = vA > 0.002 ? uPR*hot*mix(30.0, 17.0, smoothstep(1500.0, uFar, dist)) : 0.0;',
+      '  gl_PointSize = vA > 0.002 ? uPR*hot*mix(30.0, 18.0, smoothstep(1500.0, uFar, dist)) : 0.0;',
       '}'
     ].join('\n'),
     fragmentShader: [
@@ -635,12 +639,12 @@ function start() {
   var pv = new THREE.Vector3();
   function poiAt(cx, cy, W, H) {
     if (!POI) return null;
-    var best = null, bd = 15 * 15, cp = camera.position, far2 = Math.pow(POI_FAR * 0.95, 2);
+    var best = null, bd = 15 * 15, cp = camera.position;
     for (var i = 0; i < POI.list.length; i++) {
       var it = POI.list[i]; if (poiOn[it.c] < 0.5) continue;
       var x = POI.pos[i * 3], y = POI.pos[i * 3 + 1], z = POI.pos[i * 3 + 2];
-      var dx = x - cp.x, dy = y - cp.y, dz = z - cp.z, d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 > far2) continue;
+      var dx = x - cp.x, dy = y - cp.y, dz = z - cp.z, d2 = dx * dx + dy * dy + dz * dz, fc = poiFar[it.c] * 0.8;
+      if (d2 > fc * fc) continue;
       pv.set(x, y, z).project(camera);
       if (pv.z > 1) continue;
       var sx = (pv.x + 1) / 2 * W, sy = (1 - pv.y) / 2 * H - Math.min(Math.sqrt(d2) * 0.006, 120) / (U.uPx.value * Math.sqrt(d2) || 1);
@@ -878,6 +882,13 @@ function start() {
       LBL.forEach(function (L) { L.bw = 0; });
     }
   };
+  exploreAt = function (c) {
+    if (!cam) return;
+    if (!orbit) onExplore();
+    if (fly) setExplore(true, 'orbit');
+    var k = cantonKey(c);
+    orbit.E = k.E; orbit.N = k.N; orbit.d = Math.min(k.d * 0.55, 60000); orbit.p = 42; orbit.hd = k.hd;
+  };
   function inField(e) { var t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
   window.addEventListener('keydown', function (e) {
     if (!EXP.on || inField(e)) return;
@@ -987,8 +998,8 @@ function start() {
   }
   function showPoiTip(hit) {
     var c = POICAT[hit.it.c];
-    tipT.innerHTML = '<img src="' + ICONS.url[c.k] + '" alt="">' + esc(hit.it.name || c.label.replace(/e$/, ''));
-    tipA.textContent = c.label + (hit.it.name ? '' : ' · ohne Namen');
+    tipT.innerHTML = '<img src="' + ICONS.url[c.k] + '" alt="">' + esc(hit.it.name || c.one);
+    tipA.textContent = hit.it.name ? c.one : 'ohne Namen in den Daten';
     tipB.textContent = swiss(hit.it.h) + ' m ü. M. · ' + swiss(hit.it.E) + ' / ' + swiss(hit.it.N);
     var tx = hit.sx + 16, ty = hit.sy + 16;
     if (tx > window.innerWidth - 250) tx = hit.sx - 250; if (ty > window.innerHeight - 90) ty = hit.sy - 90;
@@ -998,7 +1009,6 @@ function start() {
     var hit = poiAt(x, y, window.innerWidth, window.innerHeight);
     if (hit) { showPoiTip(hit); poiMat.uniforms.uHot.value = hit.i; tapTip = performance.now() + 4000;
       if (EXP.mode === 'orbit') { orbit.E = hit.it.E; orbit.N = hit.it.N; orbit.d = Math.min(orbit.d, 4000); } return; }
-    if (EXP.mode === 'orbit') { var g = pick(x, y); if (g) { var id = idAt(g.E, g.N); if (id && !selected) selectCanton(BYID[id].code); } }
   }
   labelsEl.addEventListener('click', function (e) {
     var el = e.target.closest('.lbl.poi'); if (!el || !el.__L || !EXP.on) return;
