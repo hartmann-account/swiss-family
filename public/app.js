@@ -700,8 +700,8 @@ function start() {
       o.holder.position.set(gx, gy, gz);
       var dist = camera.position.distanceTo(o.holder.position);
       var hot = selCode === o.code && selMark === m.idx;
-      var px = hot ? 110 : selCode === o.code ? 86 : 70;
-      var sc = Math.max(1, px * kpx * dist / o.h) * (0.3 + 0.7 * o.vis);
+      var px = hot ? 130 : selCode === o.code ? 104 : 92;
+      var sc = Math.max(1.6, px * kpx * dist / o.h) * (0.3 + 0.7 * o.vis);
       o.holder.scale.set(sc, sc, sc);
       o.holder.visible = true;
       var pulse = (t * 0.45 + o.ph / 6.28) % 1;
@@ -1145,6 +1145,7 @@ function start() {
     if (tapTip && now > tapTip) { tapTip = 0; poiMat.uniforms.uHot.value = -1; tip.classList.remove('on'); }
     labelsEl.style.visibility = LAYERS.labels ? '' : 'hidden';
     var dk = U.uDark.value > 0.5; hemi.intensity = dk ? 0.62 : 1.1; sun.intensity = dk ? 0.9 : 1.6;
+    if (window.SFModels && window.SFModels.setLift && dk !== frame.dk) { window.SFModels.setLift(dk ? 0.2 : 0.35); frame.dk = dk; }
     if (detail) {
       var fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       detail.update({ E: cam.E, N: cam.N, cE: camera.position.x + EC, cN: NC - camera.position.z, cH: Math.max(0, alt), D: XP && fly ? alt * 1.6 + 1500 : Math.min(cam.d, alt * 1.4 + cam.d * 0.3), frustum: fr }, dt, now);

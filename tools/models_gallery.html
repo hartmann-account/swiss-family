@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wahrzeichen-Modelle</title>
+<!-- Testseite für public/models.js: alle Typen im Raster, feste Kamera.
+     Parameter: ?only=typ,typ  ?cols=4  ?t=12 (Zeit anhalten)  ?el=35 (Kamerahöhe in Grad)  ?az=0 (Kamerarichtung in Grad)
+     Aus der Konsole: GALLERY.setTime(t), GALLERY.stats -->
+<style>
+  html, body { margin: 0; height: 100%; background: #E9E6DF; font: 12px/1.3 system-ui, sans-serif; color: #2A2726; overflow: hidden; }
+  canvas { display: block; }
+  .lbl { position: absolute; transform: translate(-50%, 0); white-space: nowrap; pointer-events: none;
+         background: rgba(255, 255, 255, .82); padding: 2px 6px; border-radius: 4px; }
+  .lbl b { font-weight: 600; }
+  .lbl span { color: #6A665F; margin-left: 4px; }
+  #info { position: absolute; left: 10px; top: 8px; background: rgba(255, 255, 255, .85); padding: 4px 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="info"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
+<script src="../public/kantone.js"></script>
+<script src="../public/models.js"></script>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search), M = window.SFModels, KC = window.KANTONE.C;
+  var list = q.get('only') ? q.get('only').split(',') : M.types.slice();
+  var cols = +q.get('cols') || Math.ceil(Math.sqrt(list.length * 1.5)), S = +q.get('space') || 190;
+  var rows = Math.ceil(list.length / cols), fixedT = q.has('t') ? +q.get('t') : null;
+
+  THREE.ColorManagement.enabled = false;
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setClearColor(0xE9E6DF);
+  document.body.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 1.1));
+  var sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-1, 1.6, -0.8); scene.add(sun);
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(cols * S + 400, rows * S + 400).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xC9CCBE, roughness: 1, metalness: 0 }));
+  ground.position.y = -0.05; scene.add(ground);
+
+  // Farben: erstes Wahrzeichen, das den Typ verwendet, sonst Schweiz
+  function colorsFor(type) {
+    for (var key in M.markType) if (M.markType[key] === type) {
+      var k = KC[key.split(':')[0]].color;
+      return { brand: k.brand, accent: k.flag[1] || k.flag[0], code: key };
+    }
+    return { brand: KC.CH.color.brand, accent: '#FFFFFF', code: 'CH' };
+  }
+  function triangles(o) {
+    var n = 0;
+    o.traverse(function (m) {
+      if (!m.isMesh) return;
+      var g = m.geometry, c = g.index ? g.index.count / 3 : g.attributes.position.count / 3;
+      n += c * (m.isInstancedMesh ? m.count : 1);
+    });
+    return Math.round(n);
+  }
+  function particleCount(o) { var n = 0; o.traverse(function (m) { if (m.isPoints) n += m.geometry.attributes.position.count; }); return n; }
+  function drawCalls(o) { var n = 0; o.traverse(function (m) { if (m.isMesh || m.isPoints) n++; }); return n; }
+
+  var models = [], stats = {}, labels = [];
+  list.forEach(function (type, i) {
+    var col = colorsFor(type), m = M.create(type, { brand: col.brand, accent: col.accent, seed: 3 });
+    var x = (i % cols - (cols - 1) / 2) * S, z = (Math.floor(i / cols) - (rows - 1) / 2) * S;
+    m.group.position.set(x, 0, z); scene.add(m.group); models.push(m);
+    var box = new THREE.Box3().setFromObject(m.group);
+    stats[type] = { triangles: triangles(m.group), particles: particleCount(m.group), draws: drawCalls(m.group), mark: col.code,
+      size: [box.max.x - box.min.x, box.max.y - box.min.y, box.max.z - box.min.z].map(function (v) { return Math.round(v - 0); }) };
+    var el = document.createElement('div'); el.className = 'lbl';
+    el.innerHTML = '<b>' + type + '</b><span>' + stats[type].triangles + ' ▲</span>';
+    document.body.appendChild(el); labels.push({ el: el, p: new THREE.Vector3(x, 0, Math.min(z + S * .45, box.max.z + 6)) });
+  });
+  var tmax = 0; for (var t in stats) tmax = Math.max(tmax, stats[t].triangles);
+  var all = new THREE.Box3(); models.forEach(function (m) { all.expandByObject(m.group); });
+  document.getElementById('info').textContent = list.length + ' Typen · max. ' + tmax + ' Dreiecke';
+
+  var camera = new THREE.PerspectiveCamera(30, 1, 10, 50000);
+  var el = (+q.get('el') || 32) * Math.PI / 180, az = (+q.get('az') || 0) * Math.PI / 180;
+  // Abstand so wählen, dass alle Modelle ins Bild passen
+  function frame() {
+    var w = window.innerWidth, h = window.innerHeight, lo = 20, hi = 1e5, pts = [], cx = (all.min.x + all.max.x) / 2, cz = (all.min.z + all.max.z) / 2, ty = Math.min(40, all.max.y * .4);
+    renderer.setSize(w, h); camera.aspect = w / h;
+    [0, 1].forEach(function (a) { [0, 1].forEach(function (b) { [0, 1].forEach(function (c) {
+      pts.push(new THREE.Vector3(a ? all.max.x : all.min.x, c ? all.max.y : Math.max(0, all.min.y), b ? all.max.z : all.min.z)); }); }); });
+    for (var it = 0; it < 40; it++) {
+      var d = (lo + hi) / 2, ok = true;
+      camera.position.set(cx + Math.sin(az) * Math.cos(el) * d, ty + Math.sin(el) * d, cz + Math.cos(az) * Math.cos(el) * d);
+      camera.lookAt(cx, ty, cz); camera.near = d * .02; camera.far = d * 6; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      pts.forEach(function (p) { var v = p.clone().project(camera); if (Math.abs(v.x) > .97 || Math.abs(v.y) > .93 || v.z > 1) ok = false; });
+      if (ok) hi = d; else lo = d;
+    }
+    d = hi;
+    camera.position.set(cx + Math.sin(az) * Math.cos(el) * d, ty + Math.sin(el) * d, cz + Math.cos(az) * Math.cos(el) * d);
+    camera.lookAt(cx, ty, cz); camera.near = d * .02; camera.far = d * 6; camera.updateProjectionMatrix();
+  }
+  frame(); window.addEventListener('resize', frame);
+
+  var v = new THREE.Vector3(), last = performance.now() / 1000, start = last;
+  function render(time, dt) {
+    for (var i = 0; i < models.length; i++) models[i].update(time, dt);
+    renderer.render(scene, camera);
+    var w = window.innerWidth, h = window.innerHeight;
+    labels.forEach(function (l) { v.copy(l.p).project(camera); l.el.style.left = (v.x * .5 + .5) * w + 'px'; l.el.style.top = (-v.y * .5 + .5) * h + 'px'; });
+  }
+  function loop() {
+    var now = performance.now() / 1000, dt = Math.min(.1, now - last); last = now;
+    if (fixedT == null) render(now - start, dt);
+    requestAnimationFrame(loop);
+  }
+  window.GALLERY = { stats: stats, maxTriangles: tmax, setTime: function (t) { fixedT = t; render(t, 1 / 30); }, ready: true };
+  if (fixedT != null) render(fixedT, 1 / 30);
+  loop();
+})();
+</script>
+</body>
+</html>
