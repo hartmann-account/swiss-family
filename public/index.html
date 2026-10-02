@@ -72,7 +72,7 @@ main a, main button, .card{pointer-events:auto}
 .mark{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:max(16px,5vw);z-index:5;display:flex;align-items:center;gap:9px;
   font-family:var(--f-display);font-variation-settings:"wdth" 118;font-weight:700;font-size:13px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--ink);opacity:0;transform:translateY(-6px);transition:opacity .4s, transform .4s;pointer-events:none;
-  text-shadow:0 0 6px var(--halo)}
+  padding:6px 12px 6px 8px;margin-left:-8px;background:var(--card);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--rule)}
 .mark.on{opacity:1;transform:none}
 .mark i{font-style:normal;color:var(--brand-text);transition:color .6s}
 .mark img{width:16px;height:19px;object-fit:contain}
@@ -322,7 +322,7 @@ footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font
       <article class="card">
         <p class="kicker">Zürich</p>
         <h2>Ein Kanton als eigene Grossregion</h2>
-        <p>Kein Kanton zählt mehr Einwohner. Er reicht vom Rhein im Norden bis an den oberen Zürichsee und ins Tösstal. Die Stadt Zürich liegt am Ausfluss der Limmat aus dem See.</p>
+        <p>Kein Kanton zählt mehr Einwohner. Er reicht vom Rhein im Norden über das Weinland bis ins Zürcher Oberland. Die Stadt Zürich liegt am Ausfluss der Limmat aus dem See.</p>
         <ul class="rows" data-rows="zuerich"></ul>
       </article>
     </div>
@@ -355,7 +355,7 @@ footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font
       <article class="card">
         <p class="kicker">Tessin</p>
         <h2>Südlich des Gotthards</h2>
-        <p>Das Tessin ist der einzige Kanton mit Italienisch als alleiniger Amtssprache. Am Lago Maggiore liegt auf 193&nbsp;m ü.&nbsp;M. der tiefste Punkt der Schweiz, keine 70&nbsp;km vom Rheinwaldhorn auf über 3400&nbsp;m entfernt.</p>
+        <p>Das Tessin ist der einzige Kanton mit Italienisch als alleiniger Amtssprache. Am Lago Maggiore liegt auf 193&nbsp;m ü.&nbsp;M. der tiefste Punkt der Schweiz, keine 50&nbsp;km Luftlinie vom Rheinwaldhorn auf 3402&nbsp;m entfernt.</p>
         <ul class="rows" data-rows="tessin"></ul>
       </article>
     </div>

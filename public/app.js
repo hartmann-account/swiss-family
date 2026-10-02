@@ -248,7 +248,7 @@ function start() {
       '  vec2 uvH = (vUv*(uHgtSize-1.0)+0.5)/uHgtSize; float h = texture2D(uHgt, uvH).r;',
       '  float h100=h/100.0, w100=max(fwidth(h100),1e-5); float l100 = 1.0-clamp(abs(fract(h100-0.5)-0.5)/w100, 0.0, 1.0);',
       '  float h500=h/500.0, w500=max(fwidth(h500),1e-5); float l500 = 1.0-clamp(abs(fract(h500-0.5)-0.5)/(w500*1.3), 0.0, 1.0);',
-      '  float cont = max(l100*0.14*(1.0-smoothstep(0.08,0.26,w100)), l500*0.4*(1.0-smoothstep(0.2,0.5,w500)));',
+      '  float cont = max(l100*0.10*(1.0-smoothstep(0.05,0.18,w100)), l500*0.34*(1.0-smoothstep(0.15,0.4,w500)))*(1.0-0.45*uDark);',
       '  col = mix(col, uContour, cont*uContourA*(0.2+0.8*inside)*(1.0-water));',
       '  float hv = 0.0; for(int i=0;i<' + NK + ';i++){ if(i==id) hv=uHiv[i]; }',
       '  float hov = (abs(idf-uHover)<0.5) ? inside : 0.0;',
@@ -618,7 +618,7 @@ function start() {
     var hiTarget = new Array(NK).fill(0);
     (HI[keyA] || []).forEach(function (c) { hiTarget[BYCODE[c].id] += 1 - tb; });
     (HI[keyB] || []).forEach(function (c) { hiTarget[BYCODE[c].id] += tb; });
-    var finW = keyB === 'kantone' ? tb : keyA === 'kantone' ? 1 - tb : 0;
+    var finW = (keyA === 'kantone' ? 1 - tb : 0) + (keyB === 'kantone' ? tb : 0);
     if (selected) hiTarget[selected.id] = Math.max(hiTarget[selected.id], finW);
     for (var i = 0; i < NK; i++) hiCur[i] = lerp(hiCur[i], hiTarget[i], kf);
     var TU = terrainMat.uniforms;
@@ -716,7 +716,7 @@ function start() {
     renderer.render(scene, camera);
     if (!TEST) requestAnimationFrame(frame);
   }
-  if (TEST) { window.__frame = function () { frame(performance.now()); return true; }; window.__R = R; }
+  if (TEST) { window.__frame = function () { frame(performance.now()); return true; }; window.__R = R; window.__RING = RING; }
 
   /* ---------------- Start ---------------- */
   (async function boot() {

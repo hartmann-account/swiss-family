@@ -254,6 +254,9 @@ PEAK_H = {'Dufourspitze': 4634, 'Matterhorn': 4478, 'Dom': 4545, 'Weisshorn': 45
           'Eiger': 3967, 'Piz Bernina': 4049, 'Tödi': 3614, 'Titlis': 3238, 'Säntis': 2502, 'Grand Combin': 4314,
           'Rheinwaldhorn': 3402, 'Piz Kesch': 3418, 'Chasseral': 1607, 'Wildspitz': 1580, 'Rigi': 1797, 'Niesen': 2362}
 LAKE_NAME = {'Lac de la Gruyère': 'Greyerzersee'}
+# Grenzgipfel: zusätzlich im Kapitel der Nachbarregion zeigen
+EXTRA_REGIONS = {'Rheinwaldhorn': ['tessin'], 'Jungfrau': ['lemanique'], 'Finsteraarhorn': ['mittelland'], 'Tödi': ['zentral'],
+                 'Titlis': ['zentral'], 'Matterhorn': ['lemanique'], 'Dufourspitze': ['lemanique']}
 kidx = kt.set_index('kantonsnummer')
 
 
@@ -274,7 +277,8 @@ if os.path.exists(pp):
     for p in src['peaks']:
         code = canton_at(p['E'], p['N'])
         places['peaks'].append({'name': p['name'], 'E': p['E'], 'N': p['N'], 'h': PEAK_H.get(p['name'], p['h']),
-                                'regions': [REGION[code]] if code else [], 'big': p['name'] in BIG_PEAKS})
+                                'regions': sorted(set(([REGION[code]] if code else []) + EXTRA_REGIONS.get(p['name'], []))),
+                                'big': p['name'] in BIG_PEAKS})
     places['lakes'] = []
     for p in src['lakes']:
         code = canton_at(p['E'], p['N'])
