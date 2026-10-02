@@ -26,7 +26,7 @@
   --m-land:#EEF0F2; --m-lit:#FFFFFF; --m-shade:#6E7584; --m-forest:#E1E7E1; --m-out:#F2F3F5;
   --m-water:#3A8DCB; --m-water-deep:#0C4C85; --m-contour:#556074; --m-hi:#D52B1E;
   --m-side:#D52B1E; --m-side-2:#7E1710; --m-line:#D52B1E; --m-nation:#D52B1E; --m-cant:#3A4252;
-  --m-river:#2F86C9; --m-shore:#1F6EAD;
+  --m-river:#2F86C9; --m-shore:#1F6EAD; --m-route:#D99A00;
   --m-dark:0;
 }
 @media (prefers-color-scheme: dark){
@@ -38,7 +38,7 @@
     --brand-text:#FF7B70;
     --m-land:#1E2430; --m-lit:#404B5E; --m-shade:#05070B; --m-forest:#C3CAD4; --m-out:#10141C;
     --m-water:#114F8E; --m-water-deep:#062851; --m-contour:#8FA3C2; --m-hi:#FF5A4C;
-    --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8;
+    --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8; --m-route:#FFC83D;
     --m-dark:1;
   }
 }
@@ -50,7 +50,7 @@
   --brand-text:#FF7B70;
   --m-land:#1E2430; --m-lit:#404B5E; --m-shade:#05070B; --m-forest:#C3CAD4; --m-out:#10141C;
   --m-water:#114F8E; --m-water-deep:#062851; --m-contour:#8FA3C2; --m-hi:#FF5A4C;
-  --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8;
+  --m-side-2:#2A0805; --m-line:#FF5A4C; --m-nation:#FF5A4C; --m-cant:#9AA6BA; --m-river:#3E9DE4; --m-shore:#3487C8; --m-route:#FFC83D;
   --m-dark:1;
 }
 *{box-sizing:border-box}
@@ -223,6 +223,73 @@ footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font
   .under{padding-block:24px 28px}
 }
 .noscene .cue{display:none}
+.noscene .tools{display:none}
+/* ---------- Ebenen und Erkunden */
+.tools{position:fixed;right:max(16px,2.4vw);top:calc(56px + env(safe-area-inset-top,0px));z-index:6;display:flex;gap:8px;pointer-events:auto}
+.exploring .tools{top:calc(12px + env(safe-area-inset-top,0px))}
+.exploring .legend{top:calc(60px + env(safe-area-inset-top,0px))}
+.tbtn{appearance:none;display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--rule);background:var(--card);color:var(--ink);cursor:pointer;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-family:var(--f-mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 10px 24px -18px var(--shadow)}
+.tbtn svg{width:16px;height:16px;flex:none}
+.tbtn:hover{border-color:var(--brand)}
+.tbtn[aria-pressed="true"],.tbtn[aria-expanded="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.tbtn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.legend{position:fixed;right:max(16px,2.4vw);top:calc(104px + env(safe-area-inset-top,0px));z-index:7;width:min(19rem,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;
+  background:var(--card);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:4px solid var(--brand);padding:12px 14px 12px;box-shadow:0 18px 40px -24px var(--shadow);pointer-events:auto}
+.legend header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.legend header b{font-family:var(--f-display);font-variation-settings:"wdth" 106;font-weight:700;font-size:17px}
+.legend header button{appearance:none;border:0;background:transparent;color:var(--ink-2);font-size:22px;line-height:1;cursor:pointer;padding:2px 6px}
+.lg-h{margin:10px 0 4px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-text)}
+.lg-row{display:grid;grid-template-columns:auto 26px 1fr;gap:9px;align-items:center;padding:4px 0;font-size:14.5px;cursor:pointer}
+.lg-row input{width:16px;height:16px;margin:0;accent-color:var(--brand)}
+.lg-sw{display:flex;align-items:center;justify-content:center}
+.lg-sw img{width:24px;height:24px}
+.lg-sw i{display:block;width:22px;height:14px;font-style:normal}
+.sw-sat{background:linear-gradient(135deg,#5E7F4A,#8FA36A 45%,#C9B98F 46%,#6E8A55);border-radius:2px}
+.sw-trail{background:linear-gradient(transparent 5px,var(--m-route) 5px 9px,transparent 9px)}
+.sw-mark{width:14px!important;height:14px!important;border-radius:50%;background:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 30%,transparent)}
+.sw-border{background:linear-gradient(transparent 5px,var(--m-nation) 5px 8px,transparent 8px)}
+.sw-water{background:linear-gradient(transparent 5px,var(--m-river) 5px 8px,transparent 8px)}
+.sw-label{font-family:var(--f-display);font-weight:700;font-size:12px;text-align:center;color:var(--ink)}
+.lg-src{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--ink-2)}
+.xbar{position:fixed;left:max(16px,2.4vw);top:calc(12px + env(safe-area-inset-top,0px));max-width:min(40rem,calc(100vw - 360px));z-index:6;display:none;align-items:center;gap:12px;pointer-events:auto;
+  background:var(--card);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--rule);padding:6px 8px 6px 6px;box-shadow:0 12px 30px -20px var(--shadow)}
+.exploring .xbar{display:flex}
+.seg{display:flex;border:1px solid var(--rule)}
+.seg button{appearance:none;border:0;background:transparent;color:var(--ink);padding:7px 12px;cursor:pointer;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.keys{font-family:var(--f-mono);font-size:11px;line-height:1.7;color:var(--ink-2)}
+.keys kbd{font-family:inherit;border:1px solid var(--rule);padding:0 4px;margin:0 1px;color:var(--ink)}
+.attrib{position:fixed;left:50%;bottom:calc(6px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:5;display:none;font-size:11px;color:var(--ink-2);text-shadow:0 0 4px var(--halo),0 0 2px var(--halo);pointer-events:none;white-space:nowrap}
+.exploring .attrib{display:block}
+.joy{position:fixed;left:0;top:0;width:120px;height:120px;border-radius:50%;border:2px solid var(--rule);background:color-mix(in srgb,var(--card) 70%,transparent);z-index:8;pointer-events:none}
+.joy span{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:var(--brand);opacity:.85}
+.flybtns{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:7;display:none;flex-direction:column;gap:8px;pointer-events:auto}
+.flybtns button{appearance:none;width:52px;height:52px;border:1px solid var(--rule);background:var(--card);color:var(--ink);font-size:20px;touch-action:none}
+.exploring.fly-touch .flybtns{display:flex}
+.exploring main,.exploring footer,.exploring .nav,.exploring .progress,.exploring .mark,.exploring .pick{opacity:0;visibility:hidden;pointer-events:none}
+main,footer,.nav,.mark,.pick{transition:opacity .45s, visibility .45s}
+html.exploring,html.exploring body{overflow:hidden;overscroll-behavior:none}
+.exploring #scene{cursor:grab;touch-action:none}
+.exploring #labels .lbl.poi{pointer-events:auto;cursor:pointer}
+.explhelp{position:fixed;left:max(16px,2.4vw);top:calc(84px + env(safe-area-inset-top,0px));z-index:6;display:none;max-width:min(36rem,calc(100vw - 32px));
+  background:var(--card);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-top:3px solid var(--brand);padding:8px 14px;font-size:13.5px;color:var(--ink-2);text-align:center;pointer-events:none}
+.exploring .explhelp:not([hidden]){display:block}
+@media (max-width:640px){
+  .tools{right:16px;top:calc(56px + env(safe-area-inset-top,0px));flex-direction:column}
+  .tbtn span{display:none} .tbtn{padding:9px}
+  .legend{left:16px;right:72px;width:auto;top:calc(56px + env(safe-area-inset-top,0px));max-height:60vh}
+  .exploring .legend{top:calc(56px + env(safe-area-inset-top,0px))}
+  .xbar{top:auto;left:50%;transform:translateX(-50%);max-width:none;bottom:calc(12px + env(safe-area-inset-bottom,0px));gap:6px;padding:5px}
+  .explhelp{top:auto;bottom:calc(70px + env(safe-area-inset-bottom,0px))}
+  .attrib{bottom:calc(62px + env(safe-area-inset-bottom,0px));font-size:10px}
+  .explhelp{left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .keys{display:none}
+  .exploring .tools{top:calc(56px + env(safe-area-inset-top,0px))}
+  .exploring .hud{top:calc(12px + env(safe-area-inset-top,0px))}
+}
+
 </style>
 </head>
 <body>
@@ -250,6 +317,28 @@ footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font
   <div><span class="st" id="hudA">Höhenmodell wird geladen …</span><span class="st" id="hudB">swissALTIRegio · LV95</span></div>
 </div>
 
+
+<div class="tools" id="tools">
+  <button type="button" class="tbtn" id="layersBtn" aria-expanded="false" aria-controls="legend"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span>Ebenen</span></button>
+  <button type="button" class="tbtn" id="exploreBtn" aria-pressed="false"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.8 5.2 9 9 5.2 10.8 7 7z" fill="currentColor"/></svg><span>Karte erkunden</span></button>
+</div>
+<aside class="legend" id="legend" hidden aria-label="Ebenen">
+  <header><b>Ebenen</b><button type="button" id="legendClose" aria-label="Ebenen schliessen">×</button></header>
+  <div id="legendBody"></div>
+  <p class="lg-src">Luftbild SWISSIMAGE und Wanderwege © swisstopo, Wanderrouten © SchweizMobil/ASTRA, Bahnhöfe und Bergbahnen © BAV, weitere Punkte © OpenStreetMap-Mitwirkende (ODbL). Luftbild und Wanderwege erscheinen beim Heranzoomen.</p>
+</aside>
+<div class="xbar" id="xbar" role="toolbar" aria-label="Kamera">
+  <div class="seg" id="modeSeg" role="group" aria-label="Bewegungsart">
+    <button type="button" data-mode="orbit" aria-pressed="true">Umkreisen</button>
+    <button type="button" data-mode="fly" aria-pressed="false">Frei fliegen</button>
+  </div>
+  <span class="keys" id="keysOrbit">Ziehen: drehen · Rechts/Shift: verschieben · Rad: zoomen · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>Q</kbd><kbd>E</kbd></span>
+  <span class="keys" id="keysFly" hidden>Klick: Maus fangen · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fliegen · <kbd>E</kbd>/<kbd>Q</kbd> hoch/runter · <kbd>Shift</kbd> schneller · Rad: Tempo · <kbd>Esc</kbd></span>
+</div>
+<div class="explhelp" id="explHelp" hidden>Freie Kamera. Mit „Frei fliegen“ steuern Sie wie in einem Spiel, Blick 360° mit der Maus. Beim Heranzoomen erscheinen Luftbild und Wanderwege.</div>
+<div class="attrib" aria-hidden="true">Luftbild, Wanderwege © swisstopo · Punkte © OpenStreetMap-Mitwirkende, BAV</div>
+<div class="joy" id="joy" hidden aria-hidden="true"><span id="joyKnob"></span></div>
+<div class="flybtns" aria-hidden="true"><button type="button" id="flyUp">▲</button><button type="button" id="flyDown">▼</button></div>
 <div class="tip" id="tip" role="status" aria-live="polite"><b id="tipT"></b><span id="tipA"></span><span id="tipB"></span></div>
 
 <main>
@@ -378,6 +467,7 @@ footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font
   <div class="wrap">
     <div class="sig" id="sig">Schweizer Familien</div>
     <p>Daten: Bundesamt für Landestopografie swisstopo. Höhenmodell swissALTIRegio (10&nbsp;m, hier auf 250&nbsp;m gemittelt), Grenzen, Flächen und Einwohnerzahlen aus swissBOUNDARIES3D (Stand 2026), Seen, Wald und Flüsse aus swissTLMRegio. Höchste und tiefste Punkte sind aus dem Höhenmodell berechnet und können von amtlichen Kotenangaben um wenige Meter abweichen. Höhen im Relief 2-fach überhöht, Koordinaten im Schweizer Landeskoordinatensystem LV95.</p>
+    <p>Nahansicht: Höhenkacheln aus swissALTIRegio (40&nbsp;m), Luftbild SWISSIMAGE und Wanderwege live aus dem WMTS von swisstopo. Wanderrouten: SchweizMobil/ASTRA. Bahnhöfe und Bergbahnen: Bundesamt für Verkehr. Spielplätze, Badis, Zoos, Museen, Feuerstellen, Campingplätze, Aussichtspunkte und Spitäler: © OpenStreetMap-Mitwirkende, Lizenz ODbL. Die 3D-Wahrzeichen sind vereinfachte Modelle, nicht massstäblich.</p>
     <p>Wappen: Wikimedia Commons, gemeinfrei. Kantonsfarben an die Wappen angelehnt; keine offizielle Seite der Kantone.</p>
     <p>© swisstopo</p>
   </div>
@@ -385,6 +475,8 @@ footer .sig{font-family:var(--f-display);font-variation-settings:"wdth" 118;font
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.1/three.min.js"></script>
 <script src="kantone.js"></script>
+<script src="models.js"></script>
+<script src="detail.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
