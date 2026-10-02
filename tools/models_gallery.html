@@ -81,7 +81,7 @@
   document.getElementById('info').textContent = list.length + ' Typen · max. ' + tmax + ' Dreiecke';
 
   var camera = new THREE.PerspectiveCamera(30, 1, 10, 50000);
-  var el = (+q.get('el') || 32) * Math.PI / 180, az = (+q.get('az') || 0) * Math.PI / 180;
+  var el = (q.has('el') ? +q.get('el') : 32) * Math.PI / 180, az = (+q.get('az') || 0) * Math.PI / 180;
   // Abstand so wählen, dass alle Modelle ins Bild passen
   function frame() {
     var w = window.innerWidth, h = window.innerHeight, lo = 20, hi = 1e5, pts = [], cx = (all.min.x + all.max.x) / 2, cz = (all.min.z + all.max.z) / 2, ty = Math.min(40, all.max.y * .4);
@@ -110,7 +110,7 @@
   }
   function loop() {
     var now = performance.now() / 1000, dt = Math.min(.1, now - last); last = now;
-    if (fixedT == null) render(now - start, dt);
+    render(fixedT == null ? now - start : fixedT, fixedT == null ? dt : 1 / 30);   // feste Zeit weiter zeichnen, sonst bleibt die Fläche nach einem Resize leer
     requestAnimationFrame(loop);
   }
   window.GALLERY = { stats: stats, maxTriangles: tmax, setTime: function (t) { fixedT = t; render(t, 1 / 30); }, ready: true };

@@ -632,7 +632,7 @@ window.SFModels = (function () {
   // Objekt mit Vorderseite +x zwischen zwei Punkten ausrichten
   function orient(o, front, back) {
     o.position.copy(front).add(back).multiplyScalar(.5);
-    var dx = front.x - back.x, dy = front.y - back.y, dz = front.z - back.z, l = Math.hypot(dx, dz);
+    var dx = front.x - back.x, dy = front.y - back.y, dz = front.z - back.z, l = Math.sqrt(dx * dx + dz * dz);
     o.rotation.set(0, Math.atan2(-dz, dx), Math.atan2(dy, l), 'YZX');
   }
   function pingpong(t, period) { var f = (t / period) % 1; f = f < .5 ? f * 2 : 2 - f * 2; return f * f * (3 - 2 * f); }
@@ -1193,7 +1193,7 @@ window.SFModels = (function () {
     }
     c.A.push(function (t) {
       var s = 1 + Math.sin(t * 1.1) * .03; lion.scale.set(1.4, 1.4 * s, 1.4 * (1 + (s - 1) * .6));
-      rings.forEach(function (g, i) { var f = (t / 4 + i / 3) % 1; g.scale.setScalar(.5 + f * 6); g.material.opacity = .6 * (1 - f); });
+      for (var i = 0; i < rings.length; i++) { var f = (t / 4 + i / 3) % 1; rings[i].scale.setScalar(.5 + f * 6); rings[i].material.opacity = .6 * (1 - f); }
     });
   };
 
@@ -1650,7 +1650,7 @@ window.SFModels = (function () {
     var hikers = [];
     for (k = 0; k < 4; k++) { var h = part(function (hb) { person(hb, 0, 0, 0, 2.6, k % 2 ? c.brand : '#3A3F4A'); }); c.g.add(h); hikers.push(h); }
     var path = new Path(line.slice(2, 11).map(function (q) { return [q[0] + 8, q[3] + 2.4, q[1]]; })), v = new T.Vector3();
-    c.A.push(function (t) { hikers.forEach(function (h, i) { path.at(((t * 1.6 - i * 3) % path.len + path.len) % path.len, v); h.position.copy(v); }); });
+    c.A.push(function (t) { for (var i = 0; i < hikers.length; i++) { path.at(((t * 1.6 - i * 3) % path.len + path.len) % path.len, v); hikers[i].position.copy(v); } });
   };
 
   TYPES.ridge = function (c) {

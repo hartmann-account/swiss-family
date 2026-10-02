@@ -682,7 +682,7 @@ function start() {
         ring.rotation.x = -Math.PI / 2; ring.position.y = 1.5; ring.renderOrder = 7;
         var foot = Math.max(size.x, size.z) * 0.62 + 12; ring.scale.set(foot, foot, foot);
         holder.add(ring); holder.visible = false; scene.add(holder);
-        MODELS.push({ m: m, code: code, holder: holder, inst: inst, ring: ring, foot: foot, h: Math.max(35, size.y, Math.max(size.x, size.z) * 0.6), vis: 0, ph: (m.idx * 1.7 + code.charCodeAt(0)) % 6.28 });
+        MODELS.push({ m: m, code: code, holder: holder, inst: inst, ring: ring, foot: foot, h: Math.max(35, bb.max.y, Math.max(size.x, size.z) * 0.6), vis: 0, ph: (m.idx * 1.7 + code.charCodeAt(0)) % 6.28 });
       });
     });
   }
